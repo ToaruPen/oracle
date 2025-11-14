@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import 'dotenv/config';
-import { Command, InvalidArgumentError } from 'commander';
+import { Command, InvalidArgumentError, Option } from 'commander';
 import chalk from 'chalk';
 import kleur from 'kleur';
 import { spawn } from 'node:child_process';
