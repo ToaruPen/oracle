@@ -4,6 +4,7 @@ This repository relies on autonomous agents to run the `oracle` CLI safely. When
 
 ## Current Expectations
 
+- **NPM publishes require explicit user approval per release.** Never publish to npm unless the user authorizes that specific release; one approval covers one publish only.
 - When a user pastes a CLI command that is failing and you implement a fix, only execute that command yourself as the *final* verification step. (Skip the rerun entirely if the command would be destructive or dangerous—ask the user instead.)
 - Browser runs now exist (`oracle --browser`). They spin up a Chrome helper process, log its PID in the session output, and shouldn't be combined with `--preview`. If you modify this flow, keep `docs/browser-mode.md` updated.
 - Browser mode now uploads every `--file` path individually via the ChatGPT composer (system/user text stays inline). The automation waits for uploads to finish before hitting submit. Use `--browser-inline-files` as a debug escape hatch when you need to fall back to pasting file contents, and keep this note + `docs/browser-mode.md` updated if the behavior changes.
