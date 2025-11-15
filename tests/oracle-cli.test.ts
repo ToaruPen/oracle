@@ -7,8 +7,6 @@ import {
   buildPrompt,
   runOracle,
   renderPromptMarkdown,
-  collectPaths,
-  parseIntOption,
   readFiles,
   createFileSections,
   MODEL_CONFIGS,
@@ -20,6 +18,7 @@ import {
   getFileTokenStats,
   printFileTokenStats,
 } from '../src/oracle.ts';
+import { collectPaths, parseIntOption } from '../src/cli/options.ts';
 import type {
   MinimalFsModule,
   ClientLike,

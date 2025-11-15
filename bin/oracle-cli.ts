@@ -11,13 +11,14 @@ import {
   deleteSessionsOlderThan,
 } from '../src/sessionManager.js';
 import type { SessionMetadata, SessionMode, BrowserSessionConfig } from '../src/sessionManager.js';
-import { runOracle, parseIntOption, renderPromptMarkdown, readFiles } from '../src/oracle.js';
+import { runOracle, renderPromptMarkdown, readFiles } from '../src/oracle.js';
 import type { ModelName, PreviewMode, RunOracleOptions } from '../src/oracle.js';
 import { CHATGPT_URL } from '../src/browserMode.js';
 import { applyHelpStyling } from '../src/cli/help.js';
 import {
   collectPaths,
   parseFloatOption,
+  parseIntOption,
   parseSearchOption,
   validateModel,
   usesDefaultStatusFilters,
@@ -141,12 +142,16 @@ program
   });
 
 const statusCommand = program
-  .command('status')
-  .description('List recent sessions (24h window by default).')
+  .command('status [id]')
+  .description('List recent sessions (24h window by default) or attach to a session when an ID is provided.')
   .option('--hours <hours>', 'Look back this many hours (default 24).', parseFloatOption, 24)
   .option('--limit <count>', 'Maximum sessions to show (max 1000).', parseIntOption, 100)
   .option('--all', 'Include all stored sessions regardless of age.', false)
-  .action(async (_options, command: Command) => {
+  .action(async (sessionId: string | undefined, _options: StatusOptions, command: Command) => {
+    if (sessionId) {
+      await attachSession(sessionId);
+      return;
+    }
     const statusOptions = command.opts<StatusOptions>();
     const showExamples = usesDefaultStatusFilters(command);
     await showStatus({

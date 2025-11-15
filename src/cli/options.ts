@@ -18,6 +18,17 @@ export function parseFloatOption(value: string): number {
   return parsed;
 }
 
+export function parseIntOption(value: string | undefined): number | undefined {
+  if (value == null) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) {
+    throw new InvalidArgumentError('Value must be an integer.');
+  }
+  return parsed;
+}
+
 export function validateModel(value: string): ModelName {
   if (!(value in MODEL_CONFIGS)) {
     throw new InvalidArgumentError(`Unsupported model "${value}". Choose one of: ${Object.keys(MODEL_CONFIGS).join(', ')}`);

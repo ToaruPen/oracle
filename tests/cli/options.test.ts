@@ -3,6 +3,7 @@ import { InvalidArgumentError } from 'commander';
 import {
   collectPaths,
   parseFloatOption,
+  parseIntOption,
   resolvePreviewMode,
 } from '../../src/cli/options.ts';
 
@@ -24,6 +25,17 @@ describe('parseFloatOption', () => {
 
   test('throws for NaN input', () => {
     expect(() => parseFloatOption('nope')).toThrow(InvalidArgumentError);
+  });
+});
+
+describe('parseIntOption', () => {
+  test('parses integers and allows undefined', () => {
+    expect(parseIntOption(undefined)).toBeUndefined();
+    expect(parseIntOption('42')).toBe(42);
+  });
+
+  test('throws for invalid integers', () => {
+    expect(() => parseIntOption('not-a-number')).toThrow(InvalidArgumentError);
   });
 });
 
