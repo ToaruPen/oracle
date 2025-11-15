@@ -23,6 +23,10 @@ export const ANSWER_SELECTORS = [
 
 export const CONVERSATION_TURN_SELECTOR = 'article[data-testid^="conversation-turn"]';
 export const ASSISTANT_ROLE_SELECTOR = '[data-message-author-role="assistant"]';
+export const PROMPT_PRIMARY_SELECTOR = '#prompt-textarea';
+export const PROMPT_FALLBACK_SELECTOR = 'textarea[name="prompt-textarea"]';
+export const FILE_INPUT_SELECTOR = 'form input[type="file"]:not([accept])';
+export const GENERIC_FILE_INPUT_SELECTOR = 'input[type="file"]:not([accept])';
 
 export const STOP_BUTTON_SELECTOR = '[data-testid="stop-button"]';
 export const SEND_BUTTON_SELECTOR = '[data-testid="send-button"]';

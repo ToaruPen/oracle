@@ -9,6 +9,10 @@ import {
   STOP_BUTTON_SELECTOR,
   CONVERSATION_TURN_SELECTOR,
   ASSISTANT_ROLE_SELECTOR,
+  PROMPT_PRIMARY_SELECTOR,
+  PROMPT_FALLBACK_SELECTOR,
+  FILE_INPUT_SELECTOR,
+  GENERIC_FILE_INPUT_SELECTOR,
 } from './constants.js';
 import { delay } from './utils.js';
 
@@ -359,10 +363,12 @@ export async function submitPrompt(
 
   await input.insertText({ text: prompt });
 
+  const primarySelectorLiteral = JSON.stringify(PROMPT_PRIMARY_SELECTOR);
+  const fallbackSelectorLiteral = JSON.stringify(PROMPT_FALLBACK_SELECTOR);
   const verification = await runtime.evaluate({
     expression: `(() => {
-      const editor = document.querySelector('#prompt-textarea');
-      const fallback = document.querySelector('textarea[name="prompt-textarea"]');
+      const editor = document.querySelector(${primarySelectorLiteral});
+      const fallback = document.querySelector(${fallbackSelectorLiteral});
       return {
         editorText: editor?.innerText ?? '',
         fallbackValue: fallback?.value ?? '',
@@ -376,13 +382,13 @@ export async function submitPrompt(
   if (!editorText && !fallbackValue) {
       await runtime.evaluate({
       expression: `(() => {
-        const fallback = document.querySelector('textarea[name="prompt-textarea"]');
+        const fallback = document.querySelector(${fallbackSelectorLiteral});
         if (fallback) {
           fallback.value = ${encodedPrompt};
           fallback.dispatchEvent(new InputEvent('input', { bubbles: true, data: ${encodedPrompt}, inputType: 'insertFromPaste' }));
           fallback.dispatchEvent(new Event('change', { bubbles: true }));
         }
-        const editor = document.querySelector('#prompt-textarea');
+        const editor = document.querySelector(${primarySelectorLiteral});
         if (editor) {
           editor.textContent = ${encodedPrompt};
         }
@@ -424,7 +430,7 @@ export async function uploadAttachmentFile(
     throw new Error('DOM domain unavailable while uploading attachments.');
   }
   const documentNode = await dom.getDocument();
-  const selectors = ['form input[type="file"]:not([accept])', 'input[type="file"]:not([accept])'];
+  const selectors = [FILE_INPUT_SELECTOR, GENERIC_FILE_INPUT_SELECTOR];
   let targetNodeId: number | undefined;
   for (const selector of selectors) {
     const result = await dom.querySelector({ nodeId: documentNode.root.nodeId, selector });
@@ -491,9 +497,11 @@ async function verifyPromptCommitted(
 ) {
   const deadline = Date.now() + timeoutMs;
   const encodedPrompt = JSON.stringify(prompt.trim());
+  const primarySelectorLiteral = JSON.stringify(PROMPT_PRIMARY_SELECTOR);
+  const fallbackSelectorLiteral = JSON.stringify(PROMPT_FALLBACK_SELECTOR);
   const script = `(() => {
-    const editor = document.querySelector('#prompt-textarea');
-    const fallback = document.querySelector('textarea[name="prompt-textarea"]');
+    const editor = document.querySelector(${primarySelectorLiteral});
+    const fallback = document.querySelector(${fallbackSelectorLiteral});
     const normalize = (value) => value?.toLowerCase?.().replace(/\\s+/g, ' ').trim() ?? '';
     const normalizedPrompt = normalize(${encodedPrompt});
     const CONVERSATION_SELECTOR = ${JSON.stringify(CONVERSATION_TURN_SELECTOR)};
@@ -527,7 +535,7 @@ async function waitForAttachmentSelection(
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   const expression = `(() => {
-    const selector = 'input[type="file"]:not([accept])';
+    const selector = ${JSON.stringify(GENERIC_FILE_INPUT_SELECTOR)};
     const input = document.querySelector(selector);
     if (!input || !input.files) {
       return { matched: false, names: [] };
