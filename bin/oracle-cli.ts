@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { Command, Option } from 'commander';
 import type { OptionValues } from 'commander';
 import chalk from 'chalk';
@@ -75,6 +77,7 @@ interface CliOptions extends OptionValues {
 type ResolvedCliOptions = Omit<CliOptions, 'model'> & { model: ModelName };
 
 const VERSION = '1.0.0';
+const CLI_ENTRYPOINT = fileURLToPath(import.meta.url);
 const rawCliArgs = process.argv.slice(2);
 const isTty = process.stdout.isTTY;
 
@@ -373,8 +376,21 @@ async function runRootCommand(options: CliOptions): Promise<void> {
     process.cwd(),
   );
   const liveRunOptions: RunOracleOptions = { ...baseRunOptions, sessionId: sessionMeta.id };
-  await runInteractiveSession(sessionMeta, liveRunOptions, sessionMode, browserConfig, true);
-  console.log(chalk.bold(`Session ${sessionMeta.id} completed`));
+  const detached = await launchDetachedSession(sessionMeta.id).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(chalk.yellow(`Unable to detach session runner (${message}). Running inline...`));
+    return false;
+  });
+  if (detached === false) {
+    await runInteractiveSession(sessionMeta, liveRunOptions, sessionMode, browserConfig, true);
+    console.log(chalk.bold(`Session ${sessionMeta.id} completed`));
+    return;
+  }
+  if (detached) {
+    console.log(chalk.blue(`Reattach via: oracle session ${sessionMeta.id}`));
+    await attachSession(sessionMeta.id, { suppressMetadata: true });
+    console.log(chalk.bold(`Session ${sessionMeta.id} completed`));
+  }
 }
 
 async function runInteractiveSession(
@@ -420,6 +436,26 @@ async function runInteractiveSession(
   } finally {
     stream.end();
   }
+}
+
+async function launchDetachedSession(sessionId: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    try {
+      const args = ['--', CLI_ENTRYPOINT, '--exec-session', sessionId];
+      const child = spawn(process.execPath, args, {
+        detached: true,
+        stdio: 'ignore',
+        env: process.env,
+      });
+      child.once('error', reject);
+      child.once('spawn', () => {
+        child.unref();
+        resolve(true);
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 async function executeSession(sessionId: string) {

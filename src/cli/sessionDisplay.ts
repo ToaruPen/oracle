@@ -59,7 +59,11 @@ export async function showStatus({ hours, includeAll, limit, showExamples = fals
   }
 }
 
-export async function attachSession(sessionId: string): Promise<void> {
+export interface AttachSessionOptions {
+  suppressMetadata?: boolean;
+}
+
+export async function attachSession(sessionId: string, options?: AttachSessionOptions): Promise<void> {
   const metadata = await readSessionMetadata(sessionId);
   if (!metadata) {
     console.error(chalk.red(`No session found with ID ${sessionId}`));
@@ -67,25 +71,27 @@ export async function attachSession(sessionId: string): Promise<void> {
     return;
   }
   const initialStatus = metadata.status;
-  console.log(chalk.bold(`Session: ${sessionId}`));
-  const reattachLine = buildReattachLine(metadata);
-  if (reattachLine) {
-    console.log(chalk.blue(reattachLine));
-  }
-  console.log(`Created: ${metadata.createdAt}`);
-  console.log(`Status: ${metadata.status}`);
-  console.log(`Model: ${metadata.model}`);
-  const responseSummary = formatResponseMetadata(metadata.response);
-  if (responseSummary) {
-    console.log(dim(`Response: ${responseSummary}`));
-  }
-  const transportSummary = formatTransportMetadata(metadata.transport);
-  if (transportSummary) {
-    console.log(dim(`Transport: ${transportSummary}`));
-  }
-  const userErrorSummary = formatUserErrorMetadata(metadata.error);
-  if (userErrorSummary) {
-    console.log(dim(`User error: ${userErrorSummary}`));
+  if (!options?.suppressMetadata) {
+    console.log(chalk.bold(`Session: ${sessionId}`));
+    const reattachLine = buildReattachLine(metadata);
+    if (reattachLine) {
+      console.log(chalk.blue(reattachLine));
+    }
+    console.log(`Created: ${metadata.createdAt}`);
+    console.log(`Status: ${metadata.status}`);
+    console.log(`Model: ${metadata.model}`);
+    const responseSummary = formatResponseMetadata(metadata.response);
+    if (responseSummary) {
+      console.log(dim(`Response: ${responseSummary}`));
+    }
+    const transportSummary = formatTransportMetadata(metadata.transport);
+    if (transportSummary) {
+      console.log(dim(`Transport: ${transportSummary}`));
+    }
+    const userErrorSummary = formatUserErrorMetadata(metadata.error);
+    if (userErrorSummary) {
+      console.log(dim(`User error: ${userErrorSummary}`));
+    }
   }
 
   let lastLength = 0;
@@ -108,13 +114,15 @@ export async function attachSession(sessionId: string): Promise<void> {
     }
     if (latest.status === 'completed' || latest.status === 'error') {
       await printNew();
-      if (latest.status === 'error' && latest.errorMessage) {
-        console.log('\nResult:');
-        console.log(`Session failed: ${latest.errorMessage}`);
-      }
-      if (latest.usage && initialStatus === 'running') {
-        const usage = latest.usage;
-        console.log(`\nFinished (tok i/o/r/t: ${usage.inputTokens}/${usage.outputTokens}/${usage.reasoningTokens}/${usage.totalTokens})`);
+      if (!options?.suppressMetadata) {
+        if (latest.status === 'error' && latest.errorMessage) {
+          console.log('\nResult:');
+          console.log(`Session failed: ${latest.errorMessage}`);
+        }
+        if (latest.usage && initialStatus === 'running') {
+          const usage = latest.usage;
+          console.log(`\nFinished (tok i/o/r/t: ${usage.inputTokens}/${usage.outputTokens}/${usage.reasoningTokens}/${usage.totalTokens})`);
+        }
       }
       break;
     }
