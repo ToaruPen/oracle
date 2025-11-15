@@ -24,7 +24,12 @@ describe('runBrowserSessionExecution', () => {
         cliVersion: '1.0.0',
       },
       {
-        assemblePrompt: async () => ({ markdown: 'prompt', composerText: 'prompt', estimatedInputTokens: 42 }),
+        assemblePrompt: async () => ({
+          markdown: 'prompt',
+          composerText: 'prompt',
+          estimatedInputTokens: 42,
+          attachments: [],
+        }),
         executeBrowser: async () => ({
           answerText: 'ok',
           answerMarkdown: 'ok',
@@ -50,7 +55,12 @@ describe('runBrowserSessionExecution', () => {
         cliVersion: '1.0.0',
       },
       {
-        assemblePrompt: async () => ({ markdown: 'prompt', composerText: 'prompt', estimatedInputTokens: 1 }),
+        assemblePrompt: async () => ({
+          markdown: 'prompt',
+          composerText: 'prompt',
+          estimatedInputTokens: 1,
+          attachments: [{ path: '/repo/a.txt', displayPath: 'a.txt' }],
+        }),
         executeBrowser: async () => ({
           answerText: 'text',
           answerMarkdown: 'markdown',
@@ -60,7 +70,7 @@ describe('runBrowserSessionExecution', () => {
         }),
       },
     );
-    expect(log.mock.calls.some((call) => String(call[0]).includes('[verbose]'))).toBe(true);
+    expect(log.mock.calls.some((call) => String(call[0]).includes('Browser attachments'))).toBe(true);
   });
 
   test('passes heartbeat interval through to browser runner', async () => {
@@ -81,7 +91,12 @@ describe('runBrowserSessionExecution', () => {
         cliVersion: '1.0.0',
       },
       {
-        assemblePrompt: async () => ({ markdown: 'prompt', composerText: 'prompt', estimatedInputTokens: 5 }),
+        assemblePrompt: async () => ({
+          markdown: 'prompt',
+          composerText: 'prompt',
+          estimatedInputTokens: 5,
+          attachments: [],
+        }),
         executeBrowser,
       },
     );

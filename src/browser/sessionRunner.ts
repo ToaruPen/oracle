@@ -45,13 +45,19 @@ export async function runBrowserSessionExecution(
       ),
     );
     log(chalk.dim(`[verbose] Browser prompt length: ${promptArtifacts.composerText.length} chars`));
+    if (promptArtifacts.attachments.length > 0) {
+      const attachmentList = promptArtifacts.attachments.map((attachment) => attachment.displayPath).join(', ');
+      log(chalk.dim(`[verbose] Browser attachments: ${attachmentList}`));
+    } else if (runOptions.file && runOptions.file.length > 0 && runOptions.browserInlineFiles) {
+      log(chalk.dim('[verbose] Browser inline file fallback enabled (pasting file contents).'));
+    }
   }
   const headerLine = `Oracle (${cliVersion}) launching browser mode (${runOptions.model}) with ~${promptArtifacts.estimatedInputTokens.toLocaleString()} tokens`;
   log(headerLine);
   log(chalk.dim('Chrome automation does not stream output; this may take a minute...'));
   const browserResult = await executeBrowser({
     prompt: promptArtifacts.composerText,
-    attachmentFilePath: promptArtifacts.attachmentFilePath,
+    attachments: promptArtifacts.attachments,
     config: browserConfig,
     log,
     heartbeatIntervalMs: runOptions.heartbeatIntervalMs,

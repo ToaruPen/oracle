@@ -66,6 +66,7 @@ interface CliOptions extends OptionValues {
   browserHideWindow?: boolean;
   browserKeepBrowser?: boolean;
   browserAllowCookieErrors?: boolean;
+  browserInlineFiles?: boolean;
   verbose?: boolean;
   debugHelp?: boolean;
   heartbeat?: number;
@@ -131,6 +132,9 @@ program
   .addOption(new Option('--browser-keep-browser', 'Keep Chrome running after completion.').hideHelp())
   .addOption(
     new Option('--browser-allow-cookie-errors', 'Continue even if Chrome cookies cannot be copied.').hideHelp(),
+  )
+  .addOption(
+    new Option('--browser-inline-files', 'Paste files directly into the ChatGPT composer instead of uploading attachments.').default(false),
   )
   .option('--debug-help', 'Show the advanced/debug option set and exit.', false)
   .option('--heartbeat <seconds>', 'Emit periodic in-progress updates (0 to disable).', parseHeartbeatOption, 30)
@@ -211,6 +215,7 @@ function buildRunOptions(options: ResolvedCliOptions, overrides: Partial<RunOrac
     sessionId: overrides.sessionId ?? options.sessionId,
     verbose: overrides.verbose ?? options.verbose,
     heartbeatIntervalMs: overrides.heartbeatIntervalMs ?? resolveHeartbeatIntervalMs(options.heartbeat),
+    browserInlineFiles: overrides.browserInlineFiles ?? options.browserInlineFiles ?? false,
   };
 }
 
@@ -240,6 +245,7 @@ function buildRunOptionsFromMetadata(metadata: SessionMetadata): RunOracleOption
     sessionId: metadata.id,
     verbose: stored.verbose,
     heartbeatIntervalMs: stored.heartbeatIntervalMs,
+    browserInlineFiles: stored.browserInlineFiles,
   };
 }
 

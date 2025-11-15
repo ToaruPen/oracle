@@ -85,6 +85,7 @@ export interface RunOracleOptions {
   sessionId?: string;
   verbose?: boolean;
   heartbeatIntervalMs?: number;
+  browserInlineFiles?: boolean;
 }
 
 export interface UsageSummary {

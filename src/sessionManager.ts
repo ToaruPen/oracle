@@ -58,6 +58,7 @@ export interface StoredRunOptions {
   browserConfig?: BrowserSessionConfig;
   verbose?: boolean;
   heartbeatIntervalMs?: number;
+  browserInlineFiles?: boolean;
 }
 
 export interface SessionMetadata {
@@ -203,6 +204,8 @@ export async function initializeSession(options: InitializeSessionOptions, cwd: 
       mode,
       browserConfig,
       verbose: options.verbose,
+      heartbeatIntervalMs: options.heartbeatIntervalMs,
+      browserInlineFiles: options.browserInlineFiles,
     },
   };
   await fs.writeFile(metaPath(sessionId), JSON.stringify(metadata, null, 2), 'utf8');

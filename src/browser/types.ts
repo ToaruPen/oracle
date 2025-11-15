@@ -26,6 +26,11 @@ export interface PuppeteerCookie {
 
 export type BrowserLogger = (message: string) => void;
 
+export interface BrowserAttachment {
+  path: string;
+  displayPath: string;
+}
+
 export interface BrowserAutomationConfig {
   chromeProfile?: string | null;
   chromePath?: string | null;
@@ -43,7 +48,7 @@ export interface BrowserAutomationConfig {
 
 export interface BrowserRunOptions {
   prompt: string;
-  attachmentFilePath?: string;
+  attachments?: BrowserAttachment[];
   config?: BrowserAutomationConfig;
   log?: (message: string) => void;
   heartbeatIntervalMs?: number;
