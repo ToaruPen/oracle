@@ -75,6 +75,21 @@ const VERSION = '1.0.0';
 const rawCliArgs = process.argv.slice(2);
 const isTty = process.stdout.isTTY;
 
+function resolveInheritedOption<T>(command: Command, option: string, fallback: T): T {
+  const localSource = command.getOptionValueSource?.(option);
+  if (localSource && localSource !== 'default') {
+    return command.getOptionValue(option) as T;
+  }
+  const parent = command.parent;
+  if (parent) {
+    const parentSource = parent.getOptionValueSource?.(option);
+    if (parentSource && parentSource !== 'default') {
+      return parent.getOptionValue(option) as T;
+    }
+  }
+  return fallback;
+}
+
 const program = new Command();
 applyHelpStyling(program, VERSION, isTty);
 program
@@ -149,9 +164,10 @@ sessionCommand
   .option('--hours <hours>', 'Delete sessions older than this many hours (default 24).', parseFloatOption, 24)
   .option('--all', 'Delete all stored sessions.', false)
   .action(async (_options, command: Command) => {
-    const cleanOptions = command.opts<StatusOptions>();
-    const result = await deleteSessionsOlderThan({ hours: cleanOptions.hours, includeAll: cleanOptions.all });
-    const scope = cleanOptions.all ? 'all stored sessions' : `sessions older than ${cleanOptions.hours}h`;
+    const hours = resolveInheritedOption(command, 'hours', 24);
+    const includeAll = resolveInheritedOption(command, 'all', false);
+    const result = await deleteSessionsOlderThan({ hours, includeAll });
+    const scope = includeAll ? 'all stored sessions' : `sessions older than ${hours}h`;
     console.log(`Deleted ${result.deleted} ${result.deleted === 1 ? 'session' : 'sessions'} (${scope}).`);
   });
 
@@ -182,9 +198,10 @@ statusCommand
   .option('--hours <hours>', 'Delete sessions older than this many hours (default 24).', parseFloatOption, 24)
   .option('--all', 'Delete all stored sessions.', false)
   .action(async (_options, command: Command) => {
-    const clearOptions = command.opts<StatusOptions>();
-    const result = await deleteSessionsOlderThan({ hours: clearOptions.hours, includeAll: clearOptions.all });
-    const scope = clearOptions.all ? 'all stored sessions' : `sessions older than ${clearOptions.hours}h`;
+    const hours = resolveInheritedOption(command, 'hours', 24);
+    const includeAll = resolveInheritedOption(command, 'all', false);
+    const result = await deleteSessionsOlderThan({ hours, includeAll });
+    const scope = includeAll ? 'all stored sessions' : `sessions older than ${hours}h`;
     console.log(`Deleted ${result.deleted} ${result.deleted === 1 ? 'session' : 'sessions'} (${scope}).`);
   });
 
