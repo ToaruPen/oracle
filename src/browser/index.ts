@@ -86,9 +86,11 @@ export async function runBrowserMode(options: BrowserRunOptions): Promise<Browse
     await navigateToChatGPT(Page, Runtime, config.url, logger);
     await ensureNotBlocked(Runtime, config.headless, logger);
     await ensurePromptReady(Runtime, config.inputTimeoutMs, logger);
+    logger(`Prompt textarea ready (${promptText.length.toLocaleString()} chars queued)`);
     if (config.desiredModel) {
       await ensureModelSelection(Runtime, config.desiredModel, logger);
       await ensurePromptReady(Runtime, config.inputTimeoutMs, logger);
+      logger(`Prompt textarea re-focused after model switch (${promptText.length.toLocaleString()} chars queued)`);
     }
     await submitPrompt({ runtime: Runtime, input: Input }, promptText, logger);
     const answer = await waitForAssistantResponse(Runtime, config.timeoutMs, logger);
