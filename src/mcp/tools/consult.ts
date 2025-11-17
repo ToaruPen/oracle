@@ -26,10 +26,14 @@ export function registerConsultTool(server: McpServer): void {
     {
       title: 'Run an Oracle session',
       description: 'Execute a prompt with optional files via the Oracle CLI engines and return the stored session result.',
-      inputSchema: consultInputSchema as z.ZodType<object, z.ZodTypeDef, object>,
-      outputSchema: consultOutputSchema as z.ZodType<object, z.ZodTypeDef, object>,
+      // The MCP SDK accepts either Zod schemas or raw shapes; cast to any to avoid versioned type drift.
+      // biome-ignore lint/suspicious/noExplicitAny: SDK typing accepts any JSON or Zod schema.
+      inputSchema: consultInputSchema as any,
+      // biome-ignore lint/suspicious/noExplicitAny: SDK typing accepts any JSON or Zod schema.
+      outputSchema: consultOutputSchema as any,
     },
     async (input: unknown) => {
+      const textContent = (text: string) => [{ type: 'text' as const, text }];
       const { prompt, files, model, engine, slug } = consultInputSchema.parse(input);
       const { runOptions, resolvedEngine } = mapConsultToRunOptions({ prompt, files: files ?? [], model, engine });
       const cwd = process.cwd();
@@ -42,7 +46,7 @@ export function registerConsultTool(server: McpServer): void {
       ) {
         return {
           isError: true,
-          content: [{ type: 'text', text: browserGuard ?? 'Browser engine unavailable: set DISPLAY or CHROME_PATH.' }],
+          content: textContent(browserGuard ?? 'Browser engine unavailable: set DISPLAY or CHROME_PATH.'),
         };
       }
 
@@ -112,7 +116,7 @@ export function registerConsultTool(server: McpServer): void {
         log(`Run failed: ${error instanceof Error ? error.message : String(error)}`);
         return {
           isError: true,
-          content: [{ type: 'text', text: output }],
+          content: textContent(output),
           structuredContent: {
             sessionId: sessionMeta.id,
             status: 'error',
@@ -127,7 +131,7 @@ export function registerConsultTool(server: McpServer): void {
       try {
         const finalMeta = (await readSessionMetadata(sessionMeta.id)) ?? sessionMeta;
         return {
-          content: [{ type: 'text', text: output }],
+          content: textContent(output),
           structuredContent: {
             sessionId: sessionMeta.id,
             status: finalMeta.status,
@@ -138,7 +142,7 @@ export function registerConsultTool(server: McpServer): void {
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: 'text', text: `Session completed but metadata fetch failed: ${error instanceof Error ? error.message : String(error)}` }],
+          content: textContent(`Session completed but metadata fetch failed: ${error instanceof Error ? error.message : String(error)}`),
         };
       }
     },

@@ -39,10 +39,14 @@ export function registerSessionsTool(server: McpServer): void {
     {
       title: 'List or fetch Oracle sessions',
       description: 'List stored sessions or return full stored data for a given session ID/slug.',
-      inputSchema: sessionsInputSchema as z.ZodType<object, z.ZodTypeDef, object>,
-      outputSchema: sessionsOutputSchema as z.ZodType<object, z.ZodTypeDef, object>,
+      // The MCP SDK accepts either Zod schemas or raw shapes; cast to any to avoid versioned type drift.
+      // biome-ignore lint/suspicious/noExplicitAny: SDK typing accepts any JSON or Zod schema.
+      inputSchema: sessionsInputSchema as any,
+      // biome-ignore lint/suspicious/noExplicitAny: SDK typing accepts any JSON or Zod schema.
+      outputSchema: sessionsOutputSchema as any,
     },
     async (input: unknown) => {
+      const textContent = (text: string) => [{ type: 'text' as const, text }];
       const { id, hours = 24, limit = 100, includeAll = false, detail = false } = sessionsInputSchema.parse(input);
 
       if (id) {
@@ -52,7 +56,7 @@ export function registerSessionsTool(server: McpServer): void {
             throw new Error(`Session "${id}" not found.`);
           }
           return {
-            content: [{ type: 'text', text: `${metadata.createdAt} | ${metadata.status} | ${metadata.model ?? 'n/a'} | ${metadata.id}` }],
+            content: textContent(`${metadata.createdAt} | ${metadata.status} | ${metadata.model ?? 'n/a'} | ${metadata.id}`),
             structuredContent: {
               entries: [
                 {
@@ -83,7 +87,7 @@ export function registerSessionsTool(server: McpServer): void {
           request = undefined;
         }
         return {
-          content: [{ type: 'text', text: log }],
+          content: textContent(log),
           structuredContent: { session: { metadata, log, request } },
         };
       }
@@ -93,7 +97,7 @@ export function registerSessionsTool(server: McpServer): void {
       return {
         content: [
           {
-            type: 'text',
+            type: 'text' as const,
             text: entries.map((entry) => `${entry.createdAt} | ${entry.status} | ${entry.model ?? 'n/a'} | ${entry.id}`).join('\n'),
           },
         ],
