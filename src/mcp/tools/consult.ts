@@ -25,7 +25,8 @@ export function registerConsultTool(server: McpServer): void {
     'consult',
     {
       title: 'Run an Oracle session',
-      description: 'Execute a prompt with optional files via the Oracle CLI engines and return the stored session result.',
+      description:
+        'Run a one-shot Oracle session (API or browser). Attach files/dirs for context, optional model/engine overrides, and an optional slug. Background handling follows the CLI defaults; browser runs only start when Chrome is available.',
       // The MCP SDK accepts either Zod schemas or raw shapes; cast to any to avoid versioned type drift.
       // biome-ignore lint/suspicious/noExplicitAny: SDK typing accepts any JSON or Zod schema.
       inputSchema: consultInputSchema as any,

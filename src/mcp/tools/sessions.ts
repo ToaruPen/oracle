@@ -38,7 +38,8 @@ export function registerSessionsTool(server: McpServer): void {
     'sessions',
     {
       title: 'List or fetch Oracle sessions',
-      description: 'List stored sessions or return full stored data for a given session ID/slug.',
+      description:
+        'List stored sessions (same defaults as `oracle status`) or, with id/slug, return a summary row. Pass detail:true to include metadata, log, and stored request for that session.',
       // The MCP SDK accepts either Zod schemas or raw shapes; cast to any to avoid versioned type drift.
       // biome-ignore lint/suspicious/noExplicitAny: SDK typing accepts any JSON or Zod schema.
       inputSchema: sessionsInputSchema as any,
