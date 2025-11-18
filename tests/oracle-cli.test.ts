@@ -739,6 +739,44 @@ describe('oracle utility helpers', () => {
     }
   });
 
+  test('readFiles skips default-ignored dirs when walking project roots', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'oracle-readfiles-ignore-default-'));
+    try {
+      const nodeModules = path.join(dir, 'node_modules');
+      await mkdir(nodeModules, { recursive: true });
+      const ignoredFile = path.join(nodeModules, 'leftpad.ts');
+      const keptFile = path.join(dir, 'src', 'index.ts');
+      await mkdir(path.dirname(keptFile), { recursive: true });
+      await writeFile(ignoredFile, 'ignored', 'utf8');
+      await writeFile(keptFile, 'kept', 'utf8');
+
+      const logSpy = (await import('vitest')).vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const files = await readFiles(['**/*.ts'], { cwd: dir });
+      const basenames = files.map((file) => path.basename(file.path));
+      expect(basenames).toContain('index.ts');
+      expect(basenames).not.toContain('leftpad.ts');
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('node_modules'));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('readFiles allows explicitly passed default-ignored dirs', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'oracle-readfiles-allow-default-'));
+    try {
+      const nodeModules = path.join(dir, 'node_modules');
+      await mkdir(nodeModules, { recursive: true });
+      const filePath = path.join(nodeModules, 'package.json');
+      await writeFile(filePath, '{"name":"ok"}', 'utf8');
+
+      const files = await readFiles([nodeModules], { cwd: dir });
+      const basenames = files.map((file) => path.basename(file.path));
+      expect(basenames).toContain('package.json');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   test('readFiles rejects files larger than 1 MB', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'oracle-readfiles-large-'));
     try {

@@ -43,9 +43,9 @@ export async function readFiles(
     if (!ignoredDir) {
       return true;
     }
-    const key = `${ignoredDir}|${filePath}`;
+    const displayFile = relativePath(filePath, cwd);
+    const key = `${ignoredDir}|${displayFile}`;
     if (!ignoredLog.has(key)) {
-      const displayFile = relativePath(filePath, cwd);
       console.log(`Skipping default-ignored path: ${displayFile} (matches ${ignoredDir})`);
       ignoredLog.add(key);
     }
