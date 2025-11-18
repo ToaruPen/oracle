@@ -544,6 +544,7 @@ describe('runOracle file reports', () => {
         apiKey: 'sk-test',
         client,
         log: (msg: string) => logs.push(msg),
+        cwd: dir,
       },
     );
 
