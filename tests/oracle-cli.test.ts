@@ -682,6 +682,20 @@ describe('oracle utility helpers', () => {
     }
   });
 
+  test('readFiles can opt-in to dotfiles with explicit globs', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'oracle-readfiles-dot-include-'));
+    try {
+      const dotFile = path.join(dir, '.env');
+      await writeFile(dotFile, 'SECRET=1', 'utf8');
+
+      const files = await readFiles(['**/.env'], { cwd: dir });
+      expect(files).toHaveLength(1);
+      expect(path.basename(files[0].path)).toBe('.env');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   test('readFiles honors .gitignore when present', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'oracle-readfiles-gitignore-'));
     try {
@@ -700,6 +714,26 @@ describe('oracle utility helpers', () => {
       expect(basenames).toContain('kept.txt');
       expect(basenames).not.toContain('secret.log');
       expect(basenames).not.toContain('asset.js');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('readFiles honors nested .gitignore files', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'oracle-readfiles-gitignore-nested-'));
+    try {
+      const subdir = path.join(dir, 'dist');
+      await mkdir(subdir, { recursive: true });
+      await writeFile(path.join(subdir, '.gitignore'), '*.map\n', 'utf8');
+      const ignored = path.join(subdir, 'bundle.js.map');
+      const kept = path.join(subdir, 'bundle.js');
+      await writeFile(ignored, 'ignored', 'utf8');
+      await writeFile(kept, 'kept', 'utf8');
+
+      const files = await readFiles([dir], { cwd: dir });
+      const basenames = files.map((file) => path.basename(file.path));
+      expect(basenames).toContain('bundle.js');
+      expect(basenames).not.toContain('bundle.js.map');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
