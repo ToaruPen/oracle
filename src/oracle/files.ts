@@ -340,9 +340,10 @@ function makeDirectoryPattern(relative: string): string {
 
 function isNativeFsModule(fsModule: MinimalFsModule): boolean {
   return (
-    fsModule.readFile === DEFAULT_FS.readFile &&
-    fsModule.stat === DEFAULT_FS.stat &&
-    fsModule.readdir === DEFAULT_FS.readdir
+    ((fsModule as unknown as Record<string, unknown>).__nativeFs === true ||
+    (fsModule.readFile === DEFAULT_FS.readFile &&
+      fsModule.stat === DEFAULT_FS.stat &&
+      fsModule.readdir === DEFAULT_FS.readdir))
   );
 }
 
