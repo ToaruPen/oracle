@@ -82,22 +82,12 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
     return undefined;
   };
 
+  const envVar = options.model.startsWith('gpt') ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY';
   const apiKey = getApiKeyForModel(options.model);
   if (!apiKey) {
-    const envVar = options.model.startsWith('gpt') ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY';
     throw new PromptValidationError(`Missing ${envVar}. Set it via the environment or a .env file.`, {
       env: envVar,
     });
-  }
-
-  const apiKeyLabel = options.model.startsWith('gemini') ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY';
-  const maskedKey = maskApiKey(apiKey);
-  if (maskedKey) {
-    const resolved = options.effectiveModelId && options.effectiveModelId !== options.model ? ` (resolved: ${options.effectiveModelId})` : '';
-    log(dim(`Using ${apiKeyLabel}=${maskedKey} for model ${options.model}${resolved}`));
-  }
-  if (baseUrl) {
-    log(dim(`Using base URL (redacted): ${formatBaseUrlForLog(baseUrl)}`));
   }
 
   const modelConfig = MODEL_CONFIGS[options.model];
@@ -113,6 +103,7 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
   const files = await readFiles(options.file ?? [], { cwd, fsModule });
   const searchEnabled = options.search !== false;
   logVerbose(`cwd: ${cwd}`);
+  let pendingNoFilesTip: string | null = null;
   if (files.length > 0) {
     const displayPaths = files
       .map((file) => path.relative(cwd, file.path) || file.path)
@@ -123,7 +114,8 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
   } else {
     logVerbose('No files attached.');
     if (!isPreview) {
-      log(dim('Tip: no files attached — Oracle works best with project context. Add files via --file path/to/code or docs.'));
+      pendingNoFilesTip =
+        'Tip: no files attached — Oracle works best with project context. Add files via --file path/to/code or docs.';
     }
   }
   const fileTokenInfo = getFileTokenStats(files, {
@@ -163,6 +155,18 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
     (options.filesReport || fileTokenInfo.totalTokens > inputTokenBudget) && fileTokenInfo.stats.length > 0;
   if (!isPreview) {
     log(headerLine);
+    const maskedKey = maskApiKey(apiKey);
+    if (maskedKey) {
+      const resolvedSuffix =
+        options.model.startsWith('gemini') && effectiveModelId !== modelConfig.model ? ` (resolved: ${effectiveModelId})` : '';
+      log(`Using ${envVar}=${maskedKey} for model ${modelConfig.model}${resolvedSuffix}`);
+    }
+    if (baseUrl) {
+      log(`Base URL: ${formatBaseUrlForLog(baseUrl)}`);
+    }
+    if (pendingNoFilesTip) {
+      log(pendingNoFilesTip);
+    }
     if (options.model === 'gpt-5-pro') {
       log(dim('Pro is thinking, this can take up to 30 minutes...'));
     }

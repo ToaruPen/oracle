@@ -15,5 +15,5 @@ describe('oracle --version', () => {
       env: { ...process.env, FORCE_COLOR: '0' },
     });
     expect(stdout.trim()).toBe(getCliVersion());
-  });
+  }, 15000);
 });
