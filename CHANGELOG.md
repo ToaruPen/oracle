@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Native Azure OpenAI support! Set `AZURE_OPENAI_ENDPOINT` (plus `AZURE_OPENAI_API_KEY` and optionally `AZURE_OPENAI_DEPLOYMENT`/`AZURE_OPENAI_API_VERSION`) or use the new CLI flags (`--azure-endpoint`, `--azure-deployment`, etc.) to switch automatically to the Azure client.
+- **Gemini 3 Pro Support**: Use Google's latest model via `oracle --model gemini`. Requires `GEMINI_API_KEY`.
+- `--show-model-id` flag prints the resolved model identifier (Gemini previews or GPT) for debugging.
+- Help text tip: best results come from 6–30 sentences plus key source files; very short prompts tend to be generic.
 
 ## 1.2.0 — 2025-11-18
 
