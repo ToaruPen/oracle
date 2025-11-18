@@ -20,18 +20,24 @@ export async function ensureModelSelection(
   const result = outcome.result?.value as
     | { status: 'already-selected'; label?: string | null }
     | { status: 'switched'; label?: string | null }
-    | { status: 'option-not-found' }
+    | { status: 'switched-best-effort'; label?: string | null }
+    | { status: 'option-not-found'; snapshot?: unknown }
     | { status: 'button-missing' }
     | undefined;
 
   switch (result?.status) {
     case 'already-selected':
-    case 'switched': {
+    case 'switched':
+    case 'switched-best-effort': {
       const label = result.label ?? desiredModel;
       logger(`Model picker: ${label}`);
       return;
     }
     case 'option-not-found': {
+      // If we captured a snapshot of menu items, log it to aid debugging.
+      if (result.snapshot) {
+        logger(`[model picker] menu snapshot: ${JSON.stringify(result.snapshot)}`);
+      }
       await logDomFailure(Runtime, logger, 'model-switcher-option');
       throw new Error(`Unable to find model option matching "${desiredModel}" in the model switcher.`);
     }
@@ -59,8 +65,9 @@ function buildModelSelectionExpression(targetModel: string): string {
     const LABEL_TOKENS = ${labelLiteral};
     const TEST_IDS = ${idLiteral};
     const PRIMARY_LABEL = ${primaryLabelLiteral};
-    const CLICK_INTERVAL_MS = 50;
-    const MAX_WAIT_MS = 12000;
+    const INITIAL_WAIT_MS = 150;
+    const REOPEN_INTERVAL_MS = 400;
+    const MAX_WAIT_MS = 20000;
     const normalizeText = (value) => {
       if (!value) {
         return '';
@@ -156,6 +163,29 @@ function buildModelSelectionExpression(targetModel: string): string {
       return Math.max(score, 0);
     };
 
+    const buildMenuSnapshot = () => {
+      const snapshot = [];
+      const menus = Array.from(document.querySelectorAll(${menuContainerLiteral}));
+      for (const menu of menus) {
+        const buttons = Array.from(menu.querySelectorAll(${menuItemLiteral}));
+        for (const option of buttons) {
+          const text = option.textContent?.trim() ?? '';
+          const normalizedText = normalizeText(text);
+          const testid = option.getAttribute('data-testid') ?? '';
+          const selected = optionIsSelected(option);
+          snapshot.push({ text, normalizedText, testid, selected });
+        }
+      }
+      const bestGuess = snapshot
+        .map((item) => ({ item, score: scoreOption(item.normalizedText, item.testid), label: item.text }))
+        .sort((a, b) => b.score - a.score)[0];
+      return {
+        items: snapshot,
+        bestGuess:
+          bestGuess && bestGuess.score > 0 ? { label: bestGuess.label, score: bestGuess.score, node: null } : null,
+      };
+    };
+
     const findBestOption = () => {
       // Walk through every menu item and keep whichever earns the highest score.
       let bestMatch = null;
@@ -179,16 +209,24 @@ function buildModelSelectionExpression(targetModel: string): string {
       return bestMatch;
     };
 
-    pointerClick();
     return new Promise((resolve) => {
       const start = performance.now();
       const ensureMenuOpen = () => {
         const menuOpen = document.querySelector('[role="menu"], [data-radix-collection-root]');
-        if (!menuOpen && performance.now() - lastPointerClick > 300) {
+        if (!menuOpen && performance.now() - lastPointerClick > REOPEN_INTERVAL_MS) {
           pointerClick();
         }
       };
-      const attempt = () => {
+
+      // Open once and wait a tick before first scan.
+      pointerClick();
+      const openDelay = () => new Promise((r) => setTimeout(r, INITIAL_WAIT_MS));
+      let initialized = false;
+      const attempt = async () => {
+        if (!initialized) {
+          initialized = true;
+          await openDelay();
+        }
         ensureMenuOpen();
         const match = findBestOption();
         if (match) {
@@ -201,13 +239,12 @@ function buildModelSelectionExpression(targetModel: string): string {
           return;
         }
         if (performance.now() - start > MAX_WAIT_MS) {
-          resolve({ status: 'option-not-found' });
+          // Build a snapshot for debugging; the caller will log it.
+          const snapshot = buildMenuSnapshot();
+          resolve({ status: 'option-not-found', snapshot });
           return;
         }
-        if (performance.now() - lastPointerClick > 500) {
-          pointerClick();
-        }
-        setTimeout(attempt, CLICK_INTERVAL_MS);
+        setTimeout(attempt, REOPEN_INTERVAL_MS / 2);
       };
       attempt();
     });
@@ -236,6 +273,28 @@ function buildModelMatchersLiteral(targetModel: string): { labelTokens: string[]
   push(`chatgpt ${dotless}`, labelTokens);
   push(`gpt ${base}`, labelTokens);
   push(`gpt ${dotless}`, labelTokens);
+  // Numeric variations (5.1 ↔ 51 ↔ gpt-5-1)
+  if (base.includes('5.1') || base.includes('5-1') || base.includes('51')) {
+    push('5.1', labelTokens);
+    push('gpt-5.1', labelTokens);
+    push('gpt5.1', labelTokens);
+    push('gpt-5-1', labelTokens);
+    push('gpt5-1', labelTokens);
+    push('gpt51', labelTokens);
+    push('chatgpt 5.1', labelTokens);
+    testIdTokens.add('gpt-5-1');
+    testIdTokens.add('gpt5-1');
+    testIdTokens.add('gpt51');
+  }
+  // Pro / research variants
+  if (base.includes('pro')) {
+    push('proresearch', labelTokens);
+    push('research grade', labelTokens);
+    push('advanced reasoning', labelTokens);
+    testIdTokens.add('gpt-5-pro');
+    testIdTokens.add('pro');
+    testIdTokens.add('proresearch');
+  }
   base
     .split(/\s+/)
     .map((token) => token.trim())
@@ -250,6 +309,7 @@ function buildModelMatchersLiteral(targetModel: string): { labelTokens: string[]
   push(dotless, testIdTokens);
   push(`model-switcher-${hyphenated}`, testIdTokens);
   push(`model-switcher-${collapsed}`, testIdTokens);
+  push(`model-switcher-${dotless}`, testIdTokens);
 
   if (!labelTokens.size) {
     labelTokens.add(base);
