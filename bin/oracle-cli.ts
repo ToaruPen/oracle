@@ -582,11 +582,16 @@ async function runRootCommand(options: CliOptions): Promise<void> {
     : [];
   const primaryModelCandidate = normalizedMultiModels[0] ?? resolvedModelCandidate;
   const isGemini = primaryModelCandidate.startsWith('gemini');
+  const isCodex = primaryModelCandidate.startsWith('gpt-5.1-codex');
   const userForcedBrowser = options.browser || options.engine === 'browser';
   if (isGemini && userForcedBrowser) {
     throw new Error('Gemini is only supported via API. Use --engine api.');
   }
   if (isGemini && engine === 'browser') {
+    engine = 'api';
+  }
+  if (isCodex && engine === 'browser') {
+    console.log(chalk.dim('Browser engine is not supported for gpt-5.1-codex; switching to API.'));
     engine = 'api';
   }
   if (normalizedMultiModels.length > 0) {

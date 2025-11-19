@@ -12,10 +12,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Replaced `chrome-cookies-secure` with an internal cookie reader (sqlite + Keychain/DPAPI) so we can auto-detect Chromium/Edge profiles and avoid optional rebuild loops. Rebuild instructions now target `sqlite3`, `keytar`, and `win-dpapi` directly.
-- Reject prompts shorter than 20 characters with a friendly hint (prevents accidental single-character runs). Override via ORACLE_MIN_PROMPT_CHARS for automated environments.
+- Reject prompts shorter than 20 characters with a friendly hint for `gpt-5-pro` only (prevents accidental costly runs while leaving cheaper models unblocked). Override via ORACLE_MIN_PROMPT_CHARS for automated environments.
 - Browser engine default timeout bumped from 15m (900s) to 20m (1200s) so long GPT-5 Pro responses don’t get cut off; CLI docs/help text now reflect the new ceiling.
 - Duration flags such as `--browser-timeout`/`--browser-input-timeout` now accept chained units (`1h2m10s`, `3m10s`, etc.) plus `h`, `m`, `s`, or `ms` suffixes, matching the formats we already log.
 - GPT-5 Pro API runs now default to a 60-minute timeout (was 20m) and the “zombie” detector waits the same hour before marking sessions as `error`; CLI messaging/docs updated accordingly so a single “auto” limit covers both behaviors.
+- Browser-to-API coercion now happens automatically for GPT-5.1 Codex and Gemini (with a console hint) instead of failing when `--engine browser` is set.
 
 ## 1.3.0 — 2025-11-19
 

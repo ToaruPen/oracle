@@ -18,6 +18,7 @@ export interface ResolveRunOptionsInput {
 export interface ResolvedRunOptions {
   runOptions: RunOracleOptions;
   resolvedEngine: EngineMode;
+  engineCoercedToApi?: boolean;
 }
 
 export function resolveRunOptionsFromConfig({
@@ -45,9 +46,7 @@ export function resolveRunOptionsFromConfig({
   // and dispatch the exact identifier (useful for Gemini preview aliases).
   const effectiveModelId = isGemini ? resolveGeminiModelId(resolvedModel) : resolvedModel;
 
-  if ((isGemini || isCodex) && browserRequested) {
-    throw new Error('Gemini and GPT-5.1 Codex models are API-only. Use --engine api.');
-  }
+  const engineCoercedToApi = (isGemini || isCodex) && browserRequested;
   // When Gemini or Codex is selected, always force API engine (overrides config/env auto browser).
   const fixedEngine: EngineMode =
     isGemini || isCodex || normalizedRequestedModels.length > 0 ? 'api' : resolvedEngine;
@@ -69,7 +68,7 @@ export function resolveRunOptionsFromConfig({
       : [];
   const includesCodexMultiModel = uniqueMultiModels.some((entry) => entry.startsWith('gpt-5.1-codex'));
   if (includesCodexMultiModel && browserRequested) {
-    throw new Error('GPT-5.1 Codex multi-model runs require --engine api.');
+    // Silent coerce; multi-model still forces API.
   }
 
   const runOptions: RunOracleOptions = {
@@ -85,7 +84,7 @@ export function resolveRunOptionsFromConfig({
     effectiveModelId,
   };
 
-  return { runOptions, resolvedEngine: fixedEngine };
+  return { runOptions, resolvedEngine: fixedEngine, engineCoercedToApi };
 }
 
 function resolveEngineWithConfig({

@@ -94,7 +94,8 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
 
   const minPromptLength = Number.parseInt(process.env.ORACLE_MIN_PROMPT_CHARS ?? '20', 10);
   const promptLength = options.prompt?.trim().length ?? 0;
-  if (!Number.isNaN(minPromptLength) && promptLength < minPromptLength) {
+  // Enforce the short-prompt guardrail only for gpt-5-pro because it's costly; cheaper models can run short prompts without blocking.
+  if (options.model === 'gpt-5-pro' && !Number.isNaN(minPromptLength) && promptLength < minPromptLength) {
     throw new PromptValidationError(
       `Prompt is too short (<${minPromptLength} chars). This was likely accidental; please provide more detail.`,
       { minPromptLength, promptLength },
