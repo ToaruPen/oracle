@@ -95,10 +95,48 @@ export async function launchTui({ version }: LaunchTuiOptions): Promise<void> {
         message: 'Select a session or action',
         choices,
         pageSize: 16,
+        loop: false,
       },
     ]);
 
-    const { selection } = await prompt;
+    let shortcutSelection: string | null = null;
+    const promptUi = prompt as unknown as {
+      ui?: { rl: import('readline').Interface; close: () => void };
+    };
+    const rl = promptUi.ui?.rl;
+    const input = (rl as unknown as { input?: NodeJS.ReadStream })?.input;
+    const onKeypress = (_: unknown, key: { name?: string }): void => {
+      if (!key?.name) return;
+      if (!showingOlder && olderTotal > 0 && key.name === 'pagedown') {
+        shortcutSelection = '__older__';
+        promptUi.ui?.close();
+      } else if (showingOlder) {
+        if (key.name === 'pagedown' && hasOlderNext) {
+          shortcutSelection = '__more__';
+          promptUi.ui?.close();
+        } else if (key.name === 'pageup') {
+          shortcutSelection = hasOlderPrev ? '__prev__' : '__reset__';
+          promptUi.ui?.close();
+        }
+      }
+    };
+    input?.on('keypress', onKeypress);
+
+    let selection: string;
+    try {
+      ({ selection } = await prompt);
+    } catch (error) {
+      if (shortcutSelection) {
+        selection = shortcutSelection;
+      } else {
+        input?.off('keypress', onKeypress);
+        throw error;
+      }
+    }
+    input?.off('keypress', onKeypress);
+    if (shortcutSelection) {
+      selection = shortcutSelection;
+    }
 
     if (selection === '__exit__') {
       console.log(chalk.green('🧿 Closing the book. See you next prompt.'));
