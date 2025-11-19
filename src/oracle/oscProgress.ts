@@ -6,6 +6,8 @@ export interface OscProgressOptions {
   write?: (data: string) => void;
   env?: NodeJS.ProcessEnv;
   isTty?: boolean;
+  /** When true, emit an indeterminate progress indicator (no percentage). */
+  indeterminate?: boolean;
 }
 
 const OSC = '\u001b]9;4;';
@@ -44,12 +46,22 @@ export function supportsOscProgress(
 }
 
 export function startOscProgress(options: OscProgressOptions = {}): () => void {
-  const { label = 'Waiting for OpenAI', targetMs = 10 * 60_000, write = (text) => process.stdout.write(text) } =
-    options;
+  const {
+    label = 'Waiting for OpenAI',
+    targetMs = 10 * 60_000,
+    write = (text) => process.stdout.write(text),
+    indeterminate = false,
+  } = options;
   if (!supportsOscProgress(options.env, options.isTty)) {
     return () => {};
   }
   const cleanLabel = sanitizeLabel(label);
+  if (indeterminate) {
+    write(`${OSC}3;;${cleanLabel}${ST}`);
+    return () => {
+      write(`${OSC}0;0;${cleanLabel}${ST}`);
+    };
+  }
   const target = Math.max(targetMs, 1_000);
   const send = (state: number, percent: number): void => {
     const clamped = Math.max(0, Math.min(100, Math.round(percent)));

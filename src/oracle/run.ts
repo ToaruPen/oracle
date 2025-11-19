@@ -232,6 +232,7 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
   const stopOscProgress = startOscProgress({
     label: useBackground ? 'Waiting for API (background)' : 'Waiting for API',
     targetMs: useBackground ? timeoutMs : Math.min(timeoutMs, 10 * 60_000),
+    indeterminate: true,
     write,
   });
 
