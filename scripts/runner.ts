@@ -536,7 +536,7 @@ function shouldUseLongTimeout(commandArgs: string[]): boolean {
 
 // Kicks off the requested command with logging, timeouts, and monitoring.
 async function runCommand(context: RunnerExecutionContext): Promise<void> {
-  const { command, args, env } = buildExecutionParams(context.commandArgs);
+  const { command, args, env } = buildExecutionParams(context.commandArgs, context.workspaceDir);
   const commandLabel = formatDisplayCommand(context.commandArgs);
 
   const startTime = Date.now();
@@ -632,7 +632,7 @@ async function runCommand(context: RunnerExecutionContext): Promise<void> {
 }
 
 async function runCommandWithoutTimeout(context: RunnerExecutionContext): Promise<void> {
-  const { command, args, env } = buildExecutionParams(context.commandArgs);
+  const { command, args, env } = buildExecutionParams(context.commandArgs, context.workspaceDir);
   const commandLabel = formatDisplayCommand(context.commandArgs);
   const startTime = Date.now();
 
@@ -665,8 +665,12 @@ async function runCommandWithoutTimeout(context: RunnerExecutionContext): Promis
 }
 
 // Prepares the executable, args, and sanitized env for the child process.
-function buildExecutionParams(commandArgs: string[]): { command: string; args: string[]; env: NodeJS.ProcessEnv } {
+function buildExecutionParams(
+  commandArgs: string[],
+  workspaceDir: string,
+): { command: string; args: string[]; env: NodeJS.ProcessEnv } {
   const env = { ...process.env };
+  injectWorkspaceBinDirs(env, workspaceDir);
   const args: string[] = [];
   let commandStarted = false;
 
@@ -689,6 +693,43 @@ function buildExecutionParams(commandArgs: string[]): { command: string; args: s
 
   const [command, ...restArgs] = args;
   return { command, args: restArgs, env };
+}
+
+function injectWorkspaceBinDirs(env: NodeJS.ProcessEnv, workspaceDir: string): void {
+  if (ENABLE_DEBUG_LOGS) {
+    console.error(`[runner] Checking workspace bin dirs under ${workspaceDir}`);
+  }
+  const binCandidates = [
+    join(workspaceDir, 'node_modules', '.bin'),
+    join(workspaceDir, 'bin'),
+  ];
+  const existingPath = env.PATH ?? process.env.PATH ?? '';
+  const existingSegments = existingPath
+    .split(':')
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+
+  const additions: string[] = [];
+  for (const dir of binCandidates) {
+    if (!dir || !existsSync(dir)) {
+      continue;
+    }
+    if (existingSegments.includes(dir) || additions.includes(dir)) {
+      continue;
+    }
+    additions.push(dir);
+  }
+
+  if (additions.length === 0) {
+    return;
+  }
+
+  if (ENABLE_DEBUG_LOGS) {
+    console.error(`[runner] Prepending workspace PATH entries: ${additions.join(', ')}`);
+  }
+
+  const merged = [...additions, ...existingSegments];
+  env.PATH = merged.join(':');
 }
 
 // Forwards termination signals to the child and returns an unregister hook.
@@ -1501,6 +1542,8 @@ function resolveSummaryStyle(rawValue: string | undefined | null): SummaryStyle 
       return 'minimal';
     case 'verbose':
       return 'verbose';
+    case 'short':
+      return 'compact';
     default:
       return 'compact';
   }
@@ -1514,7 +1557,7 @@ function formatCompletionSummary(options: {
 }): string {
   const { exitCode, elapsedMs, timedOut, commandLabel } = options;
   const durationText = typeof elapsedMs === 'number' ? formatDuration(elapsedMs) : null;
-  // biome-ignore lint/nursery/noUnnecessaryConditions: SUMMARY_STYLE is always set; switch is intentional
+  // biome-ignore lint/nursery/noUnnecessaryConditions: switch makes the formatter easier to scan.
   switch (SUMMARY_STYLE) {
     case 'minimal': {
       const parts = [`${exitCode}`];
