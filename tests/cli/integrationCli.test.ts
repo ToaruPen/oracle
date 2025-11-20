@@ -163,7 +163,10 @@ describe('oracle CLI integration', () => {
     expect(sessionIds.length).toBe(1);
     const sessionDir = path.join(sessionsDir, sessionIds[0]);
     const metadata = JSON.parse(await readFile(path.join(sessionDir, 'meta.json'), 'utf8'));
-    expect(metadata.models?.map((m) => m.model)).toEqual(
+    const selectedModels = (metadata.models as Array<{ model: string }> | undefined)?.map(
+      (m: { model: string }) => m.model,
+    );
+    expect(selectedModels).toEqual(
       expect.arrayContaining(['gpt-5.1', 'gemini-3-pro', 'claude-4.5-sonnet']),
     );
     expect(metadata.status).toBe('completed');

@@ -86,16 +86,14 @@ export function createClaudeClient(
   resolvedModelId?: string,
   baseUrl?: string,
 ): ClientLike {
-  const modelId = resolvedModelId ?? modelName;
+  const modelId = resolveClaudeModelId(resolvedModelId ?? modelName);
 
   const stream = async (body: OracleRequestBody): Promise<ResponseStreamLike> => {
     const prompt = extractPrompt(body);
     const resp = await callClaude({ apiKey, model: modelId, prompt, stream: false, endpoint: baseUrl });
     const parsed = await parseClaudeResponse(resp);
-    let emitted = false;
     const iterator = async function* (): AsyncGenerator<ResponseStreamEvent> {
       if (parsed.output_text?.[0]) {
-        emitted = true;
         yield { type: 'response.output_text.delta', delta: parsed.output_text[0] };
       }
       return;
@@ -127,13 +125,12 @@ export function createClaudeClient(
   };
 }
 
-export function resolveClaudeModelId(modelName: ModelName): string {
-  switch (modelName) {
-    case 'claude-4.5-sonnet':
-      return 'claude-sonnet-4-5-20250929';
-    case 'claude-4.1-opus':
-      return 'claude-opus-4-1-20250805';
-    default:
-      return modelName;
+export function resolveClaudeModelId(modelName: string): string {
+  if (modelName === 'claude-4.5-sonnet' || modelName === 'claude-sonnet-4-5-20241022') {
+    return 'claude-sonnet-4-5';
   }
+  if (modelName === 'claude-4.1-opus' || modelName === 'claude-opus-4-1-20240808') {
+    return 'claude-opus-4-1';
+  }
+  return modelName;
 }

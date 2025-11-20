@@ -171,7 +171,9 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
   // Track the concrete model id we dispatch to (especially for Gemini preview aliases)
   const effectiveModelId =
     options.effectiveModelId ??
-    (options.model.startsWith('gemini') ? resolveGeminiModelId(options.model) : modelConfig.model);
+    (options.model.startsWith('gemini')
+      ? resolveGeminiModelId(options.model)
+      : modelConfig.apiModel ?? modelConfig.model);
   const headerModelLabel = richTty ? chalk.cyan(modelConfig.model) : modelConfig.model;
   const requestBody = buildRequestBody({
     modelConfig,
@@ -194,7 +196,7 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
     const maskedKey = maskApiKey(apiKey);
     if (maskedKey) {
       const resolvedSuffix =
-        options.model.startsWith('gemini') && effectiveModelId !== modelConfig.model ? ` (resolved: ${effectiveModelId})` : '';
+        effectiveModelId !== modelConfig.model ? ` (resolved: ${effectiveModelId})` : '';
       log(dim(`Using ${envVar}=${maskedKey} for model ${modelConfig.model}${resolvedSuffix}`));
     }
     if (baseUrl) {
@@ -258,7 +260,7 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
       azure: options.azure,
       model: options.model,
       resolvedModelId: modelConfig.model.startsWith('claude')
-        ? resolveClaudeModelId(effectiveModelId as ModelName)
+        ? resolveClaudeModelId(effectiveModelId)
         : modelConfig.model.startsWith('gemini')
           ? resolveGeminiModelId(effectiveModelId as ModelName)
           : effectiveModelId,

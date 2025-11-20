@@ -26,6 +26,8 @@ export type ClientFactory = (
 
 export interface ModelConfig {
   model: ModelName;
+  /** Provider-specific model id used for API calls (defaults to `model`). */
+  apiModel?: string;
   tokenizer: TokenizerFn;
   inputLimit: number;
   pricing?: {
@@ -33,6 +35,8 @@ export interface ModelConfig {
     outputPerToken: number;
   } | null;
   reasoning: { effort: ReasoningEffort } | null;
+  supportsBackground?: boolean;
+  supportsSearch?: boolean;
 }
 
 export interface FileContent {

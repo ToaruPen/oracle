@@ -1,11 +1,11 @@
 # Anthropic (Claude) Integration Plan
 
-Status: **planned** (November 20, 2025)  
-Scope: Add API support for Claude 4.5 Sonnet and Claude 4.1 Opus to Oracle CLI.
+Status: **shipped** (November 20, 2025)  
+Scope: API support for Claude 4.5 Sonnet and Claude 4.1 Opus in Oracle CLI.
 
 ## Models & Pricing (public list prices)
-- **claude-4.5-sonnet** — 200k context, ~$3 / 1M input tokens, ~$15 / 1M output tokens.
-- **claude-4.1-opus** — 200k context, ~$15 / 1M input tokens, ~$75 / 1M output tokens.
+- **claude-sonnet-4-5** (CLI alias: `claude-4.5-sonnet`) — 200k context, ~$3 / 1M input tokens, ~$15 / 1M output tokens.
+- **claude-opus-4-1** (CLI alias: `claude-4.1-opus`) — 200k context, ~$15 / 1M input tokens, ~$75 / 1M output tokens.
 - Prompt-caching premium (not modeled in CLI costs): cached input portion >200k is billed higher (Sonnet ~$6 / 1M; Opus ~$18.75 / 1M).
 
 ## Requirements
@@ -36,8 +36,8 @@ Scope: Add API support for Claude 4.5 Sonnet and Claude 4.1 Opus to Oracle CLI.
   Background stays off for Claude; GPT may still use background.
 
 ## Implementation Notes (for maintainers)
-- Types/config: add Claude IDs to `ModelName`; add Opus to `ProModelName`; `MODEL_CONFIGS` entries with pricing, 200k inputLimit, Anthropic tokenizer wrapper, `supportsBackground=false`. Opus gets `reasoning: high`.
-- Client factory: branch on `claude*` to new `createAnthropicClient(use messages.stream/create)`; pass provider-specific `baseUrl`.
+- Types/config: Claude entries use `apiModel` mapping to Anthropic IDs (`claude-sonnet-4-5`, `claude-opus-4-1`); Opus stays in `ProModelName`; pricing + 200k inputLimit; Anthropic tokenizer wrapper; `supportsBackground=false`. Opus gets `reasoning: high`.
+- Client factory: branch on `claude*` to the Anthropic adapter (messages.stream/create); pass provider-specific `baseUrl`.
 - Env selection: `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL`; log masked key per provider.
 - Token estimates: wrapper flattens Oracle message arrays into text before calling `countTokens`.
 - Multi-model: shared `runOptions.background` is gated by per-model `supportsBackground`; Claude never enters the background polling path.
@@ -55,5 +55,5 @@ Scope: Add API support for Claude 4.5 Sonnet and Claude 4.1 Opus to Oracle CLI.
 
 ## Next Steps (post-v1)
 - Optional: add tool/use support with a provider-agnostic tool layer.
-- Add dated model-id mapping if Anthropic starts versioned IDs (similar to Gemini resolver).
+- Add dated model-id mapping if Anthropic starts versioned IDs (similar to Gemini resolver) — currently aliases map to the undated IDs above.
 - Improve cost estimation if API exposes cached-token counters.

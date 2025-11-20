@@ -1,5 +1,5 @@
 import type { RunOracleOptions, ModelName } from '../oracle.js';
-import { DEFAULT_MODEL } from '../oracle.js';
+import { DEFAULT_MODEL, MODEL_CONFIGS } from '../oracle.js';
 import type { UserConfig } from '../config.js';
 import type { EngineMode } from './engine.js';
 import { resolveEngine } from './engine.js';
@@ -44,9 +44,6 @@ export function resolveRunOptionsFromConfig({
   const isGemini = resolvedModel.startsWith('gemini');
   const isCodex = resolvedModel.startsWith('gpt-5.1-codex');
   const isClaude = resolvedModel.startsWith('claude');
-  // Keep the resolved model id alongside the canonical model name so we can log
-  // and dispatch the exact identifier (useful for Gemini preview aliases).
-  const effectiveModelId = isGemini ? resolveGeminiModelId(resolvedModel) : resolvedModel;
 
   const engineCoercedToApi = (isGemini || isCodex || isClaude) && browserRequested;
   // When Gemini, Claude, or Codex is selected, always force API engine (overrides config/env auto browser).
@@ -63,7 +60,9 @@ export function resolveRunOptionsFromConfig({
   const heartbeatIntervalMs =
     userConfig?.heartbeatSeconds !== undefined ? userConfig.heartbeatSeconds * 1000 : 30_000;
 
-  const baseUrl = normalizeBaseUrl(userConfig?.apiBaseUrl ?? env.OPENAI_BASE_URL ?? env.ANTHROPIC_BASE_URL);
+  const baseUrl = normalizeBaseUrl(
+    userConfig?.apiBaseUrl ?? (isClaude ? env.ANTHROPIC_BASE_URL : env.OPENAI_BASE_URL),
+  );
   const uniqueMultiModels: ModelName[] =
     normalizedRequestedModels.length > 0
       ? Array.from(new Set(normalizedRequestedModels.map((entry) => resolveApiModel(entry))))
@@ -73,9 +72,12 @@ export function resolveRunOptionsFromConfig({
     // Silent coerce; multi-model still forces API.
   }
 
+  const chosenModel: ModelName = uniqueMultiModels[0] ?? resolvedModel;
+  const effectiveModelId = resolveEffectiveModelId(chosenModel);
+
   const runOptions: RunOracleOptions = {
     prompt: promptWithSuffix,
-    model: uniqueMultiModels[0] ?? resolvedModel,
+    model: chosenModel,
     models: uniqueMultiModels.length > 0 ? uniqueMultiModels : undefined,
     file: files ?? [],
     search,
@@ -101,4 +103,12 @@ function resolveEngineWithConfig({
   if (engine) return engine;
   if (configEngine) return configEngine;
   return resolveEngine({ engine: undefined, env });
+}
+
+function resolveEffectiveModelId(model: ModelName): string {
+  if (model.startsWith('gemini')) {
+    return resolveGeminiModelId(model);
+  }
+  const config = MODEL_CONFIGS[model];
+  return config?.apiModel ?? model;
 }

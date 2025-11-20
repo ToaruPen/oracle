@@ -10,7 +10,7 @@ import { shouldRequirePrompt } from '../src/cli/promptRequirement.js';
 import chalk from 'chalk';
 import type { SessionMetadata, SessionMode, BrowserSessionConfig } from '../src/sessionStore.js';
 import { sessionStore, pruneOldSessions } from '../src/sessionStore.js';
-import { DEFAULT_MODEL, runOracle, renderPromptMarkdown, readFiles } from '../src/oracle.js';
+import { DEFAULT_MODEL, MODEL_CONFIGS, runOracle, renderPromptMarkdown, readFiles } from '../src/oracle.js';
 import type { ModelName, PreviewMode, RunOracleOptions } from '../src/oracle.js';
 import { CHATGPT_URL } from '../src/browser/constants.js';
 import { createRemoteBrowserExecutor } from '../src/remote/client.js';
@@ -653,8 +653,12 @@ async function runRootCommand(options: CliOptions): Promise<void> {
   }
   const resolvedModel: ModelName =
     normalizedMultiModels[0] ?? (isGemini ? resolveApiModel(cliModelArg) : resolvedModelCandidate);
-  const effectiveModelId = resolvedModel.startsWith('gemini') ? resolveGeminiModelId(resolvedModel) : resolvedModel;
-  const resolvedBaseUrl = normalizeBaseUrl(options.baseUrl ?? process.env.OPENAI_BASE_URL);
+  const effectiveModelId = resolvedModel.startsWith('gemini')
+    ? resolveGeminiModelId(resolvedModel)
+    : MODEL_CONFIGS[resolvedModel]?.apiModel ?? resolvedModel;
+  const resolvedBaseUrl = normalizeBaseUrl(
+    options.baseUrl ?? (isClaude ? process.env.ANTHROPIC_BASE_URL : process.env.OPENAI_BASE_URL),
+  );
   const { models: _rawModels, ...optionsWithoutModels } = options;
   const resolvedOptions: ResolvedCliOptions = { ...optionsWithoutModels, model: resolvedModel };
   if (normalizedMultiModels.length > 0) {
