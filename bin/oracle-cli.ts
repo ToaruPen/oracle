@@ -66,6 +66,7 @@ interface CliOptions extends OptionValues {
   files?: string[];
   path?: string[];
   paths?: string[];
+  render?: boolean;
   model: string;
   models?: string[];
   force?: boolean;
@@ -274,6 +275,7 @@ program
   .addOption(new Option('--session <id>').hideHelp())
   .addOption(new Option('--status', 'Show stored sessions (alias for `oracle status`).').default(false).hideHelp())
   .option('--render-markdown', 'Emit the assembled markdown bundle for prompt + files and exit.', false)
+  .option('--render', 'Alias for --render-markdown.', false)
   .option('--verbose-render', 'Show render/TTY diagnostics when replaying sessions.', false)
   .addOption(
     new Option('--search <mode>', 'Set server-side search behavior (on/off).')
@@ -585,6 +587,7 @@ async function runRootCommand(options: CliOptions): Promise<void> {
     options.file = mergedFileInputs;
   }
   const copyMarkdown = options.copyMarkdown || options.copy;
+  const renderMarkdown = options.renderMarkdown || options.render;
 
   const applyRetentionOption = (): void => {
     if (optionUsesDefault('retainHours') && typeof userConfig.sessionRetentionHours === 'number') {
@@ -754,7 +757,7 @@ async function runRootCommand(options: CliOptions): Promise<void> {
     return;
   }
 
-  if (options.renderMarkdown || copyMarkdown) {
+  if (renderMarkdown || copyMarkdown) {
     if (!options.prompt) {
       throw new Error('Prompt is required when using --render-markdown or --copy-markdown.');
     }
@@ -774,7 +777,7 @@ async function runRootCommand(options: CliOptions): Promise<void> {
     const estimatedTokens = estimateRequestTokens(requestBody, modelConfig);
     const warnThreshold = Math.min(196_000, modelConfig.inputLimit ?? 196_000);
     warnIfOversizeBundle(estimatedTokens, warnThreshold, console.log);
-    if (options.renderMarkdown) {
+    if (renderMarkdown) {
       console.log(bundle.markdown);
     }
     if (copyMarkdown) {
