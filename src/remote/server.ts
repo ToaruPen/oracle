@@ -214,6 +214,7 @@ function sanitizeResult(result: BrowserRunResult): BrowserRunResult {
 
 async function loadLocalChatgptCookies(logger: (message: string) => void): Promise<CookieParam[] | null> {
   try {
+    logger('Loading ChatGPT cookies from host Chrome profile...');
     const cookies = await Promise.resolve(
       loadChromeCookies({
         targetUrl: CHATGPT_URL,
