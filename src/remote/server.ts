@@ -36,6 +36,7 @@ export async function createRemoteServer(
   const server = http.createServer();
   const logger = options.logger ?? console.log;
   const authToken = options.token ?? randomBytes(16).toString('hex');
+  const verbose = process.argv.includes('--verbose') || process.env.ORACLE_SERVE_VERBOSE === '1';
   // Single-flight guard: remote Chrome can only host one run at a time, so we serialize requests.
   let busy = false;
   let cachedInlineCookies: CookieParam[] | null = null;
@@ -48,6 +49,7 @@ export async function createRemoteServer(
 
   server.on('request', async (req, res) => {
     if (req.method === 'GET' && req.url === '/status') {
+      logger('[serve] Health check /status');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true }));
       return;
@@ -60,17 +62,24 @@ export async function createRemoteServer(
 
     const authHeader = req.headers.authorization ?? '';
     if (authHeader !== `Bearer ${authToken}`) {
+      if (verbose) {
+        logger(`[serve] Unauthorized /runs attempt from ${formatSocket(req)} (missing/invalid token)`);
+      }
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'unauthorized' }));
       return;
     }
     // biome-ignore lint/nursery/noUnnecessaryConditions: busy guard protects single-run host
     if (busy) {
+      if (verbose) {
+        logger(`[serve] Busy: rejecting new run from ${formatSocket(req)} while another run is active`);
+      }
       res.writeHead(409, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'busy' }));
       return;
     }
     busy = true;
+    const runStartedAt = Date.now();
 
     let payload: RemoteRunPayload | null = null;
     try {
@@ -89,6 +98,7 @@ export async function createRemoteServer(
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
 
     const runId = randomUUID();
+    logger(`[serve] Accepted run ${runId} from ${formatSocket(req)} (prompt ${payload?.prompt?.length ?? 0} chars)`);
     // Each run gets an isolated temp dir so attachments/logs don't collide.
     const runDir = await mkdtemp(path.join(os.tmpdir(), `oracle-serve-${runId}-`));
     const attachmentDir = path.join(runDir, 'attachments');
@@ -142,9 +152,11 @@ export async function createRemoteServer(
       });
 
       sendEvent({ type: 'result', result: sanitizeResult(result) });
+      logger(`[serve] Run ${runId} completed in ${Date.now() - runStartedAt}ms`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       sendEvent({ type: 'error', message });
+      logger(`[serve] Run ${runId} failed after ${Date.now() - runStartedAt}ms: ${message}`);
     } finally {
       busy = false;
       res.end();
@@ -165,6 +177,7 @@ export async function createRemoteServer(
     throw new Error('Unable to determine server address.');
   }
   logger(`Remote Oracle listening at ${address.address}:${address.port}`);
+  logger(`Access token: ${authToken}`);
 
   return {
     port: address.port,
@@ -217,6 +230,13 @@ function sanitizeResult(result: BrowserRunResult): BrowserRunResult {
     chromePort: undefined,
     userDataDir: undefined,
   };
+}
+
+function formatSocket(req: http.IncomingMessage): string {
+  const socket = req.socket;
+  const host = socket.remoteAddress ?? 'unknown';
+  const port = socket.remotePort ?? '0';
+  return `${host}:${port}`;
 }
 
 async function loadLocalChatgptCookies(logger: (message: string) => void, targetUrl: string): Promise<CookieParam[] | null> {
