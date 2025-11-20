@@ -236,7 +236,7 @@ program
   .addOption(
     new Option(
       '-e, --engine <mode>',
-      'Execution engine (api | browser). If omitted, oracle picks api when OPENAI_API_KEY is set, otherwise browser.',
+      'Execution engine (api | browser). Engine is preferred; --mode is a legacy alias. If omitted, oracle picks api when OPENAI_API_KEY is set, otherwise browser.',
     ).choices(['api', 'browser'])
   )
   .addOption(
