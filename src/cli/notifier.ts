@@ -89,13 +89,13 @@ export async function sendSessionNotification(
           await notifier.notify({ title, message, sound: settings.sound, ...(macAppIconOption()) });
           return;
         } catch (retryError) {
-          const reason = retryError instanceof Error ? retryError.message : String(retryError);
+          const reason = describeNotifierError(retryError);
           log(`(notify skipped after retry: ${reason})`);
           return;
         }
       }
     }
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = describeNotifierError(error);
     log(`(notify skipped: ${reason})`);
   }
 }
@@ -282,4 +282,21 @@ function isTestEnv(env: NodeJS.ProcessEnv): boolean {
     env.NODE_ENV === 'test' ||
     Boolean(env.VITEST || env.VITEST_WORKER_ID || env.JEST_WORKER_ID)
   );
+}
+
+function describeNotifierError(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const err = error as NodeJS.ErrnoException;
+    if (typeof err.errno === 'number' || typeof err.code === 'string') {
+      const errno = typeof err.errno === 'number' ? err.errno : undefined;
+      // macOS returns errno -86 for “Bad CPU type in executable” (e.g., wrong arch or quarantined binary).
+      if (errno === -86) {
+        return 'notifier binary failed to launch (Bad CPU type/quarantine); try xattr -dr com.apple.quarantine vendor/oracle-notifier && ./vendor/oracle-notifier/build-notifier.sh';
+      }
+    }
+    if (typeof (err as { message?: unknown }).message === 'string') {
+      return (err as { message: string }).message;
+    }
+  }
+  return typeof error === 'string' ? error : String(error);
 }

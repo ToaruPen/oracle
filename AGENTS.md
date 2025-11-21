@@ -9,6 +9,7 @@ Oracle-specific notes:
 - CLI output: the first line of any top-level CLI start banner should use the oracle emoji, e.g. `🧿 oracle (1.3.0) ...`. Avoid sprinkling the emoji elsewhere; only use it for the initial command headline. Exception: the TUI exit message also keeps the emoji.
 - Before a release, skim manual smokes in `docs/manual-tests.md` and rerun any that cover your change surface (especially browser/serve paths).
 - If browser smokes echo the prompt (Instant), rerun with `--browser-keep-browser --verbose` in tmux, then inspect DOM with `pnpm tsx scripts/browser-tools.ts eval ...` to confirm assistant turns exist; we fixed a case by refreshing assistant snapshots post-send.
+- Browser smokes should preserve Markdown (lists, fences); if output looks flattened or echoed, inspect the captured assistant turn via `browser-tools.ts eval` before shipping.
 
 Windows notes
 - `runner`/`scripts/committer` (bash) aren’t reliable on Windows; run commands directly and use plain git add/commit here.
