@@ -140,6 +140,12 @@ export function resolveApiModel(modelValue: string): ModelName {
   if (normalized.includes('claude') && normalized.includes('opus')) {
     return 'claude-4.1-opus';
   }
+  if (normalized === 'claude' || normalized === 'sonnet' || /(^|\b)sonnet(\b|$)/.test(normalized)) {
+    return 'claude-4.5-sonnet';
+  }
+  if (normalized === 'opus' || normalized === 'claude-4.1') {
+    return 'claude-4.1-opus';
+  }
   if (normalized.includes('5.0') || normalized === 'gpt-5-pro' || normalized === 'gpt-5') {
     return 'gpt-5-pro';
   }

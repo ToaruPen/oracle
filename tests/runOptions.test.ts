@@ -147,6 +147,16 @@ describe('resolveRunOptionsFromConfig', () => {
     });
     expect(resolvedEngine).toBe('api');
   });
+
+  it('normalizes shorthand multi-model entries', () => {
+    const { runOptions } = resolveRunOptionsFromConfig({
+      prompt: basePrompt,
+      models: ['gpt-5.1', 'gemini', 'sonnet'],
+    });
+
+    expect(runOptions.model).toBe('gpt-5.1');
+    expect(runOptions.models).toEqual(['gpt-5.1', 'gemini-3-pro', 'claude-4.5-sonnet']);
+  });
 });
 
 describe('estimateRequestTokens', () => {

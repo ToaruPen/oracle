@@ -147,6 +147,10 @@ describe('resolveApiModel', () => {
     expect(resolveApiModel('GPT-5.1-CODEX')).toBe('gpt-5.1-codex');
     expect(resolveApiModel('claude-4.5-sonnet')).toBe('claude-4.5-sonnet');
     expect(resolveApiModel('Claude Opus 4.1')).toBe('claude-4.1-opus');
+    expect(resolveApiModel('sonnet')).toBe('claude-4.5-sonnet');
+    expect(resolveApiModel('opus')).toBe('claude-4.1-opus');
+    expect(resolveApiModel('CLAUDE')).toBe('claude-4.5-sonnet');
+    expect(resolveApiModel('Gemini')).toBe('gemini-3-pro');
   });
 
   test('rejects codex max until API is available', () => {
