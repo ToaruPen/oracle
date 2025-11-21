@@ -38,6 +38,8 @@ npx -y @steipete/oracle session <id> --render
 npx -y @steipete/oracle
 ```
 
+Engine auto-picks API when `OPENAI_API_KEY` is set, otherwise browser; browser is stable on macOS, works on Linux with `--browser-chrome-path/--browser-cookie-path`, and is partial/experimental on Windows.
+
 ## Integration
 
 **CLI**
@@ -63,7 +65,6 @@ npx -y @steipete/oracle oracle-mcp
 - CodexBar: keep Codex and Claude usage visible from the menu bar. Download at <https://codexbar.app>.
 - Trimmy: clipboard flattener for multi-line shell snippets. Download at <https://trimmy.app>.
 - MCPorter: TypeScript runtime/CLI/codegen for MCP. <https://mcporter.dev>.
-- AskOracle: browser UI for Oracle sessions. <https://askoracle.dev>.
 
 ```json
 {
