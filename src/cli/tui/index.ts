@@ -107,7 +107,7 @@ export async function launchTui({ version }: LaunchTuiOptions): Promise<void> {
     });
 
     if (selection === '__exit__') {
-      console.log(chalk.green('Closing the book. See you next prompt.'));
+      console.log(chalk.green('🧿 Closing the book. See you next prompt.'));
       return;
     }
     if (selection === '__ask__') {
