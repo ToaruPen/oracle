@@ -122,6 +122,15 @@ Advanced flags
 - Browser: `--browser-timeout`, `--browser-input-timeout`, `--browser-inline-cookies[(-file)]`, `--browser-inline-files`, `--browser-bundle-files`, `--browser-keep-browser`, `--browser-headless`, `--browser-hide-window`, `--browser-no-cookie-sync`, `--browser-allow-cookie-errors`, `--browser-chrome-path`, `--browser-cookie-path`, `--chatgpt-url`.
 - Azure/OpenAI compatibility: `--azure-endpoint`, `--azure-deployment`, `--azure-api-version`, `--base-url`.
 
+Remote browser example
+```bash
+# Host (signed-in Chrome): launch serve
+oracle serve --host 0.0.0.0:9473 --token secret123
+
+# Client: target that host
+oracle --engine browser --remote-host 192.168.1.10:9473 --remote-token secret123 -p "Run the UI smoke" --file "src/**/*.ts"
+```
+
 ## More docs
 - Browser mode & forks: [docs/browser-mode.md](docs/browser-mode.md) (includes `oracle serve` remote service), [docs/chromium-forks.md](docs/chromium-forks.md), [docs/linux.md](docs/linux.md)
 - MCP: [docs/mcp.md](docs/mcp.md)
