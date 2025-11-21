@@ -13,9 +13,6 @@
 
 Oracle bundles your prompt + the right files into a markdown package the model can cite. One command feeds large, coherent context to GPT-5.1 Pro (default), GPT-5.1, GPT-5.1 Codex (API-only), Gemini 3 Pro, and Claude 4.5 Sonnet—plus Azure/LiteLLM-compatible endpoints you configure. Attach whole directories, get token estimates/warnings, and optionally copy or render the bundle before sending.
 
-## What is Oracle?
-Think “one-shot context drop.” You point Oracle at the files that matter; it builds a structured markdown (SYSTEM/USER + `### File:` fenced sections), then either calls the API or drives ChatGPT in the browser—same flags, same session logs.
-
 ## Quick start (npx, no install)
 
 ```bash
