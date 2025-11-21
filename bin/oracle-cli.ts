@@ -44,7 +44,7 @@ import { formatCompactNumber } from '../src/cli/format.js';
 import { formatIntroLine } from '../src/cli/tagline.js';
 import { warnIfOversizeBundle } from '../src/cli/bundleWarnings.js';
 import { formatRenderedMarkdown } from '../src/cli/renderOutput.js';
-import { resolveRenderFlag } from '../src/cli/renderFlags.js';
+import { resolveRenderFlag, resolveRenderPlain } from '../src/cli/renderFlags.js';
 import { resolveGeminiModelId } from '../src/oracle/gemini.js';
 import { handleSessionCommand, type StatusOptions, formatSessionCleanupMessage } from '../src/cli/sessionCommand.js';
 import { isErrorLogged } from '../src/cli/errorUtils.js';
@@ -278,6 +278,7 @@ program
   .addOption(new Option('--status', 'Show stored sessions (alias for `oracle status`).').default(false).hideHelp())
   .option('--render-markdown', 'Emit the assembled markdown bundle for prompt + files and exit.', false)
   .option('--render', 'Alias for --render-markdown.', false)
+  .option('--render-plain', 'Render markdown without ANSI/highlighting (use plain text even in a TTY).', false)
   .option('--verbose-render', 'Show render/TTY diagnostics when replaying sessions.', false)
   .addOption(
     new Option('--search <mode>', 'Set server-side search behavior (on/off).')
@@ -590,6 +591,7 @@ async function runRootCommand(options: CliOptions): Promise<void> {
   }
   const copyMarkdown = options.copyMarkdown || options.copy;
   const renderMarkdown = resolveRenderFlag(options.render, options.renderMarkdown);
+  const renderPlain = resolveRenderPlain(options.renderPlain, options.render, options.renderMarkdown);
 
   const applyRetentionOption = (): void => {
     if (optionUsesDefault('retainHours') && typeof userConfig.sessionRetentionHours === 'number') {
@@ -780,9 +782,11 @@ async function runRootCommand(options: CliOptions): Promise<void> {
     const warnThreshold = Math.min(196_000, modelConfig.inputLimit ?? 196_000);
     warnIfOversizeBundle(estimatedTokens, warnThreshold, console.log);
     if (renderMarkdown) {
-      const rendered = await formatRenderedMarkdown(bundle.markdown, { richTty: isTty });
+      const output = renderPlain
+        ? bundle.markdown
+        : await formatRenderedMarkdown(bundle.markdown, { richTty: isTty });
       // Trim trailing newlines from the rendered bundle so we print exactly one blank before the summary line.
-      console.log(rendered.replace(/\n+$/u, ''));
+      console.log(output.replace(/\n+$/u, ''));
     }
     if (copyMarkdown) {
       const result = await copyToClipboard(bundle.markdown);

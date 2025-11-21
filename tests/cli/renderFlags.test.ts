@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { resolveRenderFlag } from '../../src/cli/renderFlags.ts';
+import { resolveRenderFlag, resolveRenderPlain } from '../../src/cli/renderFlags.ts';
 
 describe('resolveRenderFlag', () => {
   test('prefers explicit renderMarkdown', () => {
@@ -12,5 +12,16 @@ describe('resolveRenderFlag', () => {
 
   test('false when neither flag is set', () => {
     expect(resolveRenderFlag(undefined, undefined)).toBe(false);
+  });
+
+  test('render-plain wins when any render flag is set', () => {
+    expect(resolveRenderPlain(true, false, false)).toBe(true);
+    expect(resolveRenderPlain(true, true, false)).toBe(true);
+    expect(resolveRenderPlain(true, false, true)).toBe(true);
+  });
+
+  test('render-plain is false when not requested', () => {
+    expect(resolveRenderPlain(false, true, true)).toBe(false);
+    expect(resolveRenderPlain(undefined, true, true)).toBe(false);
   });
 });
