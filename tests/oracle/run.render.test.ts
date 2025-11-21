@@ -2,15 +2,53 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { RunOracleOptions, RunOracleDeps, OracleResponse } from '../../src/oracle.js';
 
-async function loadRunOracleWithTty(isTty: boolean) {
+async function loadRunOracleWithTty(isTty: boolean, mockRendered?: string) {
   const originalTty = (process.stdout as { isTTY?: boolean }).isTTY;
   const originalForceColor = process.env.FORCE_COLOR;
   (process.stdout as { isTTY?: boolean }).isTTY = isTty;
   process.env.FORCE_COLOR = '1';
   vi.resetModules();
+  if (mockRendered) {
+    vi.doMock('../../src/cli/markdownRenderer.js', () => ({
+      renderMarkdownAnsi: vi.fn(() => mockRendered),
+    }));
+  }
   const { runOracle } = await import('../../src/oracle/run.js');
+  const renderer = await import('../../src/cli/markdownRenderer.js');
   return {
     runOracle,
+    renderer,
+    restoreEnv: () => {
+      if (originalTty === undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete (process.stdout as { isTTY?: boolean }).isTTY;
+      } else {
+        (process.stdout as { isTTY?: boolean }).isTTY = originalTty;
+      }
+      if (originalForceColor === undefined) {
+        delete process.env.FORCE_COLOR;
+      } else {
+        process.env.FORCE_COLOR = originalForceColor;
+      }
+      vi.resetModules();
+    },
+  };
+}
+
+async function loadRunOracleWithMockedRenderer(ansiRendered: string) {
+  const originalTty = (process.stdout as { isTTY?: boolean }).isTTY;
+  const originalForceColor = process.env.FORCE_COLOR;
+  (process.stdout as { isTTY?: boolean }).isTTY = true;
+  process.env.FORCE_COLOR = '1';
+  vi.resetModules();
+  vi.doMock('../../src/cli/markdownRenderer.js', () => ({
+    renderMarkdownAnsi: vi.fn(() => ansiRendered),
+  }));
+  const { runOracle } = await import('../../src/oracle/run.js');
+  const renderer = await import('../../src/cli/markdownRenderer.js');
+  return {
+    runOracle,
+    renderer,
     restore: () => {
       (process.stdout as { isTTY?: boolean }).isTTY = originalTty;
       if (originalForceColor === undefined) {
@@ -18,6 +56,7 @@ async function loadRunOracleWithTty(isTty: boolean) {
       } else {
         process.env.FORCE_COLOR = originalForceColor;
       }
+      vi.resetModules();
     },
   };
 }
@@ -52,7 +91,7 @@ describe('runOracle streaming rendering', () => {
   };
 
   it('renders streamed markdown once in rich TTY by default', async () => {
-    const { runOracle, restore } = await loadRunOracleWithTty(true);
+    const { runOracle, restoreEnv } = await loadRunOracleWithTty(true);
     const logSink: string[] = [];
     const stdoutSink: string[] = [];
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string | Uint8Array) => {
@@ -74,11 +113,11 @@ describe('runOracle streaming rendering', () => {
     expect(combined).toContain('# Title');
     expect(rendered.length).toBeGreaterThan(0); // stdout receives rendered markdown on TTY
     stdoutSpy.mockRestore();
-    restore();
+    restoreEnv();
   });
 
   it('streams raw text immediately when --render-plain is used', async () => {
-    const { runOracle, restore } = await loadRunOracleWithTty(true);
+    const { runOracle, restoreEnv } = await loadRunOracleWithTty(true);
     const sink: string[] = [];
     const stdoutSink: string[] = [];
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string | Uint8Array) => {
@@ -101,6 +140,6 @@ describe('runOracle streaming rendering', () => {
     expect(rendered).toContain('# Title');
     expect(rendered).not.toContain('\u001b[');
     stdoutSpy.mockRestore();
-    restore();
+    restoreEnv();
   });
 });
