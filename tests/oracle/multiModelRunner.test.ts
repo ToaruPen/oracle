@@ -131,6 +131,81 @@ describe('runMultiModelApiSession', () => {
     expect(statusUpdatesFor('gemini-3-pro')).toContain('completed');
   });
 
+  test('runs grok alongside other models and logs per-model output', async () => {
+    const sessionMeta: SessionMetadata = {
+      id: 'sess-grok-multi',
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      model: 'gpt-5.1-pro',
+      options: {},
+    };
+
+    const models: ModelName[] = ['grok-4.1', 'gpt-5.1'];
+    const logBodies = new Map<string, string>();
+
+    const store: SessionStore = {
+      ensureStorage: async () => {},
+      createSession: async () => sessionMeta,
+      readSession: async () => sessionMeta,
+      updateSession: async () => sessionMeta,
+      createLogWriter: (sessionId: string, model?: string) => {
+        const logPath = path.join(tmpRoot, sessionId, 'models', `${model ?? 'session'}.log`);
+        fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        fs.writeFileSync(logPath, '');
+        logBodies.set(model ?? 'session', '');
+        return {
+          logPath,
+          stream: { end: vi.fn() } as unknown as fs.WriteStream,
+          logLine: (line = '') => {
+            fs.appendFileSync(logPath, `${line}\n`);
+            logBodies.set(model ?? 'session', fs.readFileSync(logPath, 'utf8'));
+          },
+          writeChunk: (chunk: string) => {
+            fs.appendFileSync(logPath, chunk);
+            logBodies.set(model ?? 'session', fs.readFileSync(logPath, 'utf8'));
+            return true;
+          },
+        };
+      },
+      updateModelRun: async (_sessionId: string, model: string, updates: Partial<SessionModelRun>) =>
+        Promise.resolve({ model, status: updates.status ?? 'running' } as SessionModelRun),
+      readLog: async () => '',
+      readModelLog: async (_sessionId: string, model?: string) => logBodies.get(model ?? 'session') ?? '',
+      readRequest: async () => null,
+      listSessions: async () => [],
+      filterSessions: (metas) => ({ entries: metas, truncated: false, total: metas.length }),
+      deleteOlderThan: async () => ({ deleted: 0, remaining: 0 }),
+      getPaths: async (sessionId: string) => ({
+        dir: path.join(tmpRoot, sessionId),
+        metadata: '',
+        log: '',
+        request: '',
+      }),
+      sessionsDir: () => tmpRoot,
+    };
+
+    const runOracleImpl = vi.fn(async ({ model }: RunOracleOptions) => {
+      return successResult(model as ModelName);
+    });
+
+    const summary = await runMultiModelApiSession(
+      {
+        sessionMeta,
+        runOptions: { prompt: 'Cross-check this design', model: 'gpt-5.1-pro', search: false },
+        models,
+        cwd: process.cwd(),
+        version: 'test',
+      },
+      { store, runOracleImpl },
+    );
+
+    expect(runOracleImpl).toHaveBeenCalledTimes(models.length);
+    expect(runOracleImpl.mock.calls.map(([opts]) => opts.model)).toEqual(models);
+    expect(summary.fulfilled.map((r) => r.model)).toEqual(expect.arrayContaining(models));
+    expect(logBodies.get('grok-4.1')).toBeDefined();
+    expect(logBodies.get('gpt-5.1')).toBeDefined();
+  });
+
   test('invokes onModelDone callbacks in completion order', async () => {
     vi.useFakeTimers();
     const sessionMeta: SessionMetadata = {

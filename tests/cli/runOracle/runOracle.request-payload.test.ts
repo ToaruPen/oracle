@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import { runOracle } from '@src/oracle.ts';
 import { MockClient, MockStream, buildResponse } from './helpers.ts';
@@ -74,5 +74,47 @@ describe('runOracle request payload', () => {
       },
     );
     expect(captured).toEqual([{ apiKey: 'sk-test', azure: azureOptions }]);
+  });
+
+  test('uses grok search tool shape', async () => {
+    const stream = new MockStream([], buildResponse());
+    const client = new MockClient(stream);
+    await runOracle(
+      {
+        prompt: 'Search capability',
+        model: 'grok-4.1',
+        background: false,
+      },
+      {
+        apiKey: 'sk-test',
+        client,
+        log: () => {},
+      },
+    );
+    expect(client.lastRequest?.tools).toEqual([{ type: 'web_search' }]);
+    expect(client.lastRequest?.background).toBeUndefined();
+  });
+
+  test('forces foreground for models without background support (grok)', async () => {
+    const stream = new MockStream([], buildResponse());
+    const createSpy = vi.fn();
+    const client = new MockClient(stream);
+    // Override background create handler to fail if invoked.
+    client.responses.create = createSpy.mockImplementation(() => {
+      throw new Error('create should not be called for grok');
+    });
+    await runOracle(
+      {
+        prompt: 'Please run in foreground',
+        model: 'grok-4.1',
+        background: true,
+      },
+      {
+        apiKey: 'sk-test',
+        client,
+        log: () => {},
+      },
+    );
+    expect(createSpy).not.toHaveBeenCalled();
   });
 });

@@ -89,6 +89,20 @@ export const MODEL_CONFIGS: Record<ModelName, ModelConfig> = {
     supportsBackground: false,
     supportsSearch: false,
   },
+  'grok-4.1': {
+    model: 'grok-4.1',
+    apiModel: 'grok-4-1-fast-reasoning',
+    tokenizer: countTokensGpt5Pro as TokenizerFn,
+    inputLimit: 2_000_000,
+    pricing: {
+      inputPerToken: 0.2 / 1_000_000,
+      outputPerToken: 0.5 / 1_000_000,
+    },
+    reasoning: null,
+    supportsBackground: false,
+    supportsSearch: true,
+    searchToolType: 'web_search',
+  },
 };
 
 export const DEFAULT_SYSTEM_PROMPT = [

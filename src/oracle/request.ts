@@ -5,6 +5,7 @@ import type {
   MinimalFsModule,
   OracleRequestBody,
   RunOracleOptions,
+  ToolConfig,
 } from './types.js';
 import { DEFAULT_SYSTEM_PROMPT } from './config.js';
 import { createFileSections, readFiles } from './files.js';
@@ -29,6 +30,7 @@ export function buildRequestBody({
   background,
   storeResponse,
 }: BuildRequestBodyParams): OracleRequestBody {
+  const searchToolType: ToolConfig['type'] = modelConfig.searchToolType ?? 'web_search_preview';
   return {
     model: modelConfig.apiModel ?? modelConfig.model,
     instructions: systemPrompt,
@@ -43,7 +45,7 @@ export function buildRequestBody({
         ],
       },
     ],
-    tools: searchEnabled ? [{ type: 'web_search_preview' }] : undefined,
+    tools: searchEnabled ? [{ type: searchToolType }] : undefined,
     reasoning: modelConfig.reasoning || undefined,
     max_output_tokens: maxOutputTokens,
     background: background ? true : undefined,

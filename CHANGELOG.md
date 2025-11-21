@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## 0.4.3 — Unreleased
 
+### Added
+- xAI Grok 4.1 API support (`--model grok-4.1` / alias `grok`): defaults to `https://api.x.ai/v1`, uses `XAI_API_KEY`, maps search to `web_search`, and includes docs + live smoke.
+- Per-model search tool selection so Grok can use `web_search` while OpenAI models keep `web_search_preview`.
+- Multi-model coverage now includes Grok in orchestrator tests.
+- Grok “thinking”/non-fast variant is not available via API yet; Oracle aliases `grok` to the fast reasoning model to match what xAI ships today.
+
 ### Fixed
 - (pending)
 

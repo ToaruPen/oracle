@@ -134,6 +134,9 @@ export function resolveApiModel(modelValue: string): ModelName {
   if (normalized in MODEL_CONFIGS) {
     return normalized as ModelName;
   }
+  if (normalized.includes('grok')) {
+    return 'grok-4.1';
+  }
   if (normalized.includes('claude') && normalized.includes('sonnet')) {
     return 'claude-4.5-sonnet';
   }
@@ -176,6 +179,9 @@ export function inferModelFromLabel(modelValue: string): ModelName {
   }
   if (normalized in MODEL_CONFIGS) {
     return normalized as ModelName;
+  }
+  if (normalized.includes('grok')) {
+    return 'grok-4.1';
   }
   if (normalized.includes('claude') && normalized.includes('sonnet')) {
     return 'claude-4.5-sonnet';

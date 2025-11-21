@@ -157,6 +157,21 @@ describe('resolveRunOptionsFromConfig', () => {
     expect(runOptions.model).toBe('gpt-5.1');
     expect(runOptions.models).toEqual(['gpt-5.1', 'gemini-3-pro', 'claude-4.5-sonnet']);
   });
+
+  it('forces api engine for grok and defaults base url env', () => {
+    // biome-ignore lint/style/useNamingConvention: env var is uppercase by convention
+    const env: NodeJS.ProcessEnv = { XAI_BASE_URL: 'https://api.example/v1' } as NodeJS.ProcessEnv;
+    const { runOptions, resolvedEngine, engineCoercedToApi } = resolveRunOptionsFromConfig({
+      prompt: basePrompt,
+      model: 'grok',
+      engine: 'browser',
+      env,
+    });
+    expect(runOptions.model).toBe('grok-4.1');
+    expect(resolvedEngine).toBe('api');
+    expect(engineCoercedToApi).toBe(true);
+    expect(runOptions.baseUrl).toBe('https://api.example/v1');
+  });
 });
 
 describe('estimateRequestTokens', () => {

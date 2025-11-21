@@ -7,7 +7,8 @@ export type ModelName =
   | 'gpt-5.1-codex'
   | 'gemini-3-pro'
   | 'claude-4.5-sonnet'
-  | 'claude-4.1-opus';
+  | 'claude-4.1-opus'
+  | 'grok-4.1';
 
 export type ProModelName = 'gpt-5.1-pro' | 'gpt-5-pro' | 'claude-4.5-sonnet' | 'claude-4.1-opus';
 
@@ -37,6 +38,7 @@ export interface ModelConfig {
   reasoning: { effort: ReasoningEffort } | null;
   supportsBackground?: boolean;
   supportsSearch?: boolean;
+  searchToolType?: ToolConfig['type'];
 }
 
 export interface FileContent {
@@ -184,7 +186,7 @@ export interface BuildRequestBodyParams {
 }
 
 export interface ToolConfig {
-  type: 'web_search_preview';
+  type: 'web_search_preview' | 'web_search';
 }
 
 export interface OracleRequestBody {

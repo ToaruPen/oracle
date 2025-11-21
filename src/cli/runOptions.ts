@@ -44,11 +44,12 @@ export function resolveRunOptionsFromConfig({
   const isGemini = resolvedModel.startsWith('gemini');
   const isCodex = resolvedModel.startsWith('gpt-5.1-codex');
   const isClaude = resolvedModel.startsWith('claude');
+  const isGrok = resolvedModel.startsWith('grok');
 
-  const engineCoercedToApi = (isGemini || isCodex || isClaude) && browserRequested;
+  const engineCoercedToApi = (isGemini || isCodex || isClaude || isGrok) && browserRequested;
   // When Gemini, Claude, or Codex is selected, always force API engine (overrides config/env auto browser).
   const fixedEngine: EngineMode =
-    isGemini || isCodex || isClaude || normalizedRequestedModels.length > 0 ? 'api' : resolvedEngine;
+    isGemini || isCodex || isClaude || isGrok || normalizedRequestedModels.length > 0 ? 'api' : resolvedEngine;
 
   const promptWithSuffix =
     userConfig?.promptSuffix && userConfig.promptSuffix.trim().length > 0
@@ -61,7 +62,8 @@ export function resolveRunOptionsFromConfig({
     userConfig?.heartbeatSeconds !== undefined ? userConfig.heartbeatSeconds * 1000 : 30_000;
 
   const baseUrl = normalizeBaseUrl(
-    userConfig?.apiBaseUrl ?? (isClaude ? env.ANTHROPIC_BASE_URL : env.OPENAI_BASE_URL),
+    userConfig?.apiBaseUrl ??
+      (isClaude ? env.ANTHROPIC_BASE_URL : isGrok ? env.XAI_BASE_URL : env.OPENAI_BASE_URL),
   );
   const uniqueMultiModels: ModelName[] =
     normalizedRequestedModels.length > 0

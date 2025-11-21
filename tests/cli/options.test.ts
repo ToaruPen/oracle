@@ -151,6 +151,8 @@ describe('resolveApiModel', () => {
     expect(resolveApiModel('opus')).toBe('claude-4.1-opus');
     expect(resolveApiModel('CLAUDE')).toBe('claude-4.5-sonnet');
     expect(resolveApiModel('Gemini')).toBe('gemini-3-pro');
+    expect(resolveApiModel('grok')).toBe('grok-4.1');
+    expect(resolveApiModel('Grok 4.1')).toBe('grok-4.1');
   });
 
   test('rejects codex max until API is available', () => {
@@ -190,6 +192,12 @@ describe('inferModelFromLabel', () => {
   test('infers Claude family labels', () => {
     expect(inferModelFromLabel('Claude Sonnet 4.5')).toBe('claude-4.5-sonnet');
     expect(inferModelFromLabel('Claude Opus 4.1')).toBe('claude-4.1-opus');
+  });
+
+  test('infers Grok aliases', () => {
+    expect(inferModelFromLabel('grok')).toBe('grok-4.1');
+    expect(inferModelFromLabel('Grok 4.1')).toBe('grok-4.1');
+    expect(inferModelFromLabel('Grok-4-1')).toBe('grok-4.1');
   });
 
   test('falls back to gpt-5.1-pro when label empty and to gpt-5.1 for other ambiguous strings', () => {

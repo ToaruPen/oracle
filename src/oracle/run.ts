@@ -66,7 +66,15 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
     ? stdoutWriteDep ?? process.stdout.write.bind(process.stdout)
     : () => true;
   const isTty = allowStdout && isStdoutTty;
-  const baseUrl = options.baseUrl?.trim() || process.env.OPENAI_BASE_URL?.trim();
+  const resolvedXaiBaseUrl = process.env.XAI_BASE_URL?.trim() || 'https://api.x.ai/v1';
+  let baseUrl = options.baseUrl?.trim();
+  if (!baseUrl) {
+    if (options.model.startsWith('grok')) {
+      baseUrl = resolvedXaiBaseUrl;
+    } else {
+      baseUrl = process.env.OPENAI_BASE_URL?.trim();
+    }
+  }
 
   const logVerbose = (message: string): void => {
     if (options.verbose) {
@@ -93,6 +101,9 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
     if (model.startsWith('claude')) {
       return optionsApiKey ?? process.env.ANTHROPIC_API_KEY;
     }
+    if (model.startsWith('grok')) {
+      return optionsApiKey ?? process.env.XAI_API_KEY;
+    }
     return undefined;
   };
 
@@ -102,7 +113,9 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
       : 'OPENAI_API_KEY'
     : options.model.startsWith('gemini')
       ? 'GEMINI_API_KEY'
-      : 'ANTHROPIC_API_KEY';
+      : options.model.startsWith('claude')
+        ? 'ANTHROPIC_API_KEY'
+        : 'XAI_API_KEY';
   const apiKey = getApiKeyForModel(options.model);
   if (!apiKey) {
     throw new PromptValidationError(`Missing ${envVar}. Set it via the environment or a .env file.`, {
@@ -129,7 +142,8 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
     );
   }
   const isLongRunningModel = isProTierModel;
-  const useBackground = options.background ?? isLongRunningModel;
+  const supportsBackground = modelConfig.supportsBackground !== false;
+  const useBackground = supportsBackground ? options.background ?? isLongRunningModel : false;
 
   const inputTokenBudget = options.maxInput ?? modelConfig.inputLimit;
   const files = await readFiles(options.file ?? [], { cwd, fsModule });
@@ -215,6 +229,9 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
     }
     if (baseUrl) {
       log(dim(`Base URL: ${formatBaseUrlForLog(baseUrl)}`));
+    }
+    if (options.background && !supportsBackground) {
+      log(dim('Background runs are not supported for this model; streaming in foreground instead.'));
     }
     if (!options.suppressTips) {
       if (pendingNoFilesTip) {
