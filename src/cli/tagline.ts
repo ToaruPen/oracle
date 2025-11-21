@@ -111,6 +111,10 @@ const TAGLINES = [
   'AI confidence monitored, citations required.',
   'Ship logs, not lore.',
   'Hallucinations flagged, reality shipped.',
+  'We lint the lore so you can ship the code.',
+  'Hallucination hotline: we answer, not the pager.',
+  'Less mystique, more mergeability.',
+  'Slop filter set past 11.',
 ];
 
 export interface TaglineOptions {
