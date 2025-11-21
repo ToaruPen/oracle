@@ -115,6 +115,12 @@ See [docs/openai-endpoints.md](docs/openai-endpoints.md) for advanced Azure/Lite
 Every non-preview run writes to `~/.oracle/sessions/<slug>` with usage, cost hints, and logs. Use `oracle status` to list sessions, `oracle session <id>` to replay, and `oracle status --clear --hours 168` to prune. Set `ORACLE_HOME_DIR` to relocate storage.
 Add `--render` (alias `--render-markdown`) when attaching to pretty-print the stored markdown if your terminal supports color; falls back to raw text otherwise. Use `--render-plain` to force plain markdown (no ANSI) even in a rich TTY, or combine it with `--render`/`--render-markdown` if you still want the rendering path but prefer unstyled output.
 
+### Manual handoff (no browser automation)
+- Copy + preview in one step: `pnpm oracle --copy --render -p "Your prompt" --file "src/**/*.ts" --file "!src/**/*.test.ts"`
+  - Copies the bundle to your clipboard and shows a colorized preview; use `--render-plain` if you want unstyled text while copying.
+- Save bundle to disk for later pasting: `pnpm oracle --render-plain -p "Your prompt" --file path/to/files > bundle.md`
+  - Produces a clean markdown file containing the SYSTEM/USER blocks and `### File:` fenced sections; ready to paste into ChatGPT.
+
 **Recommendation:** Prefer the API engine when you have an API key (`--engine api` or just set `OPENAI_API_KEY`). The API delivers more reliable results and supports longer, uninterrupted runs than the browser engine in most cases.
 
 **Wait vs no-wait:** gpt-5.1-pro API runs default to detaching (shows a reattach hint); add `--wait` to stay attached. gpt-5.1, gpt-5.1-codex, and browser runs block by default. You can reattach anytime via `oracle session <id>`.
