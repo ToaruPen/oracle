@@ -35,6 +35,7 @@ function detectFenceLanguage(displayPath: string): string | null {
 }
 
 function pickFence(content: string): string {
+  // Choose a fence longer than any backtick run inside the file so the block can't prematurely close.
   const matches = [...content.matchAll(/`+/g)];
   const maxTicks = matches.reduce((max, m) => Math.max(max, m[0].length), 0);
   const fenceLength = Math.max(3, maxTicks + 1);

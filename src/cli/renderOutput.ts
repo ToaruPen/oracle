@@ -16,7 +16,7 @@ export async function formatRenderedMarkdown(markdown: string, options: RenderOp
   try {
     await ensureShikiReady();
   } catch {
-    // ignore renderer prep failures and fall back to plain output below
+    // If Shiki fails to init (missing terminals/themes), fall back to plain output gracefully.
   }
 
   try {

@@ -781,6 +781,7 @@ async function runRootCommand(options: CliOptions): Promise<void> {
     warnIfOversizeBundle(estimatedTokens, warnThreshold, console.log);
     if (renderMarkdown) {
       const rendered = await formatRenderedMarkdown(bundle.markdown, { richTty: isTty });
+      // Trim trailing newlines from the rendered bundle so we print exactly one blank before the summary line.
       console.log(rendered.replace(/\n+$/u, ''));
     }
     if (copyMarkdown) {
