@@ -351,8 +351,8 @@ program
       'Connect to remote Chrome DevTools Protocol (e.g., 192.168.1.10:9222 or [2001:db8::1]:9222 for IPv6).',
     ),
   )
-  .addOption(new Option('--remote-host <host:port>', 'Delegate browser runs to a remote `oracle serve` instance.').hideHelp())
-  .addOption(new Option('--remote-token <token>', 'Access token for the remote `oracle serve` instance.').hideHelp())
+  .addOption(new Option('--remote-host <host:port>', 'Delegate browser runs to a remote `oracle serve` instance.'))
+  .addOption(new Option('--remote-token <token>', 'Access token for the remote `oracle serve` instance.'))
   .addOption(
     new Option('--browser-inline-files', 'Paste files directly into the ChatGPT composer instead of uploading attachments.').default(false),
   )
