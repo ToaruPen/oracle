@@ -159,8 +159,8 @@ describe('resolveApiModel', () => {
     expect(() => resolveApiModel('gpt-5.1-codex-max')).toThrow('gpt-5.1-codex-max is not available yet');
   });
 
-  test('rejects unknown names', () => {
-    expect(() => resolveApiModel('instant')).toThrow(InvalidArgumentError);
+  test('passes through unknown names (OpenRouter/custom)', () => {
+    expect(resolveApiModel('instant')).toBe('instant');
   });
 });
 

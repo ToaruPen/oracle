@@ -1,4 +1,4 @@
-import type { ModelConfig, ModelName, KnownModelName, TokenizerFn } from './types.js';
+import type { ModelConfig, ModelName, KnownModelName, TokenizerFn, ProModelName } from './types.js';
 import { MODEL_CONFIGS, PRO_MODELS } from './config.js';
 import { countTokens as countTokensGpt5Pro } from 'gpt-tokenizer/model/gpt-5-pro';
 
@@ -62,7 +62,7 @@ async function fetchOpenRouterCatalog(apiKey: string, fetcher: FetchFn): Promise
   }
   const response = await fetcher(OPENROUTER_MODELS_ENDPOINT, {
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      authorization: `Bearer ${apiKey}`,
     },
   });
   if (!response.ok) {
@@ -116,7 +116,7 @@ export async function resolveModelConfig(
         return {
           ...(known ?? {
             model,
-            tokenizer: countTokensGpt5Pro,
+            tokenizer: countTokensGpt5Pro as TokenizerFn,
             inputLimit: info.context_length ?? 200_000,
             reasoning: null,
           }),
@@ -139,7 +139,7 @@ export async function resolveModelConfig(
       return {
         ...(known ?? {
           model,
-          tokenizer: countTokensGpt5Pro,
+          tokenizer: countTokensGpt5Pro as TokenizerFn,
           inputLimit: 200_000,
           reasoning: null,
         }),
@@ -159,7 +159,7 @@ export async function resolveModelConfig(
   return {
     ...(known ?? {
       model,
-      tokenizer: countTokensGpt5Pro,
+      tokenizer: countTokensGpt5Pro as TokenizerFn,
       inputLimit: 200_000,
       reasoning: null,
     }),

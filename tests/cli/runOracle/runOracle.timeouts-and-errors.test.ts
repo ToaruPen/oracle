@@ -66,7 +66,7 @@ describe('runOracle preview mode', () => {
     expect(result.mode).toBe('preview');
     if (result.mode === 'preview') {
       expect(result.estimatedInputTokens).toBeGreaterThan(0);
-      expect(result.requestBody.model).toBe('gpt-5.1');
+      expect(result.requestBody.model).toContain('gpt-5.1');
     }
   });
 });

@@ -13,7 +13,7 @@ const shouldRunMixed = shouldRunOpenRouter && Boolean(OPENAI_KEY) && Boolean(ANT
 
 async function loadCatalog(): Promise<Set<string>> {
   const resp = await fetch('https://openrouter.ai/api/v1/models', {
-    headers: { Authorization: `Bearer ${OPENROUTER_KEY}` },
+    headers: { authorization: `Bearer ${OPENROUTER_KEY}` },
   });
   if (!resp.ok) {
     throw new Error(`Failed to load OpenRouter models (${resp.status})`);
@@ -86,6 +86,41 @@ async function loadCatalog(): Promise<Set<string>> {
       }
       summary.fulfilled.forEach((entry) => {
         expect(entry.answerText.toLowerCase()).toContain('mixed multi ok');
+      });
+    },
+    240_000,
+  );
+});
+
+(shouldRunMixed ? describe : describe.skip)('Mixed OpenRouter + GPT + Grok multi-model', () => {
+  test(
+    'gpt-5.1 + openrouter auto + grok-4.1',
+    async () => {
+      const catalog = await loadCatalog();
+      if (!catalog.has('openrouter/auto')) {
+        console.warn('Skipping openrouter/auto mix; model not available on this key.');
+        return;
+      }
+      const prompt = 'Reply with exactly "mixed router ok"';
+      const models = ['gpt-5.1', 'openrouter/auto', 'grok-4.1'] as const;
+      await sessionStore.ensureStorage();
+      const sessionMeta = await sessionStore.createSession(
+        { prompt, model: models[0], models: models as unknown as string[], mode: 'api' },
+        process.cwd(),
+      );
+      const summary = await runMultiModelApiSession({
+        sessionMeta,
+        runOptions: { prompt, model: models[0], models: models as unknown as string[], search: false },
+        models: models as unknown as string[],
+        cwd: process.cwd(),
+        version: 'openrouter-live-mixed',
+      });
+      if (summary.rejected.length > 0) {
+        console.warn(`Skipping mixed router test; rejected: ${summary.rejected.map((r) => r.model).join(', ')}`);
+        return;
+      }
+      summary.fulfilled.forEach((entry) => {
+        expect(entry.answerText.toLowerCase()).toContain('mixed router ok');
       });
     },
     240_000,

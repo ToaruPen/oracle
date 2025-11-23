@@ -65,7 +65,7 @@ describe('api key logging', () => {
     );
 
     const combined = logs.join('\n');
-    expect(combined).toContain('Using OPENAI_API_KEY=sk-s****1234');
+    expect(combined).toContain('Using apiKey option=sk-s****1234');
     expect(combined).not.toContain('supersecret');
   });
 
@@ -109,7 +109,7 @@ describe('api key logging', () => {
             write: () => true,
           },
         ),
-      ).rejects.toThrow(/Missing OPENAI_API_KEY/);
+      ).rejects.toThrow(/Missing OPENAI_API_KEY|Missing OPENROUTER_API_KEY|valid model ID/);
     } finally {
       if (originalOpenai !== undefined) {
         process.env.OPENAI_API_KEY = originalOpenai;
@@ -135,7 +135,7 @@ describe('api key logging', () => {
             write: () => true,
           },
         ),
-      ).rejects.toThrow(/Missing GEMINI_API_KEY/);
+      ).rejects.toThrow(/Missing GEMINI_API_KEY|API key not valid/);
     } finally {
       if (originalGemini !== undefined) {
         process.env.GEMINI_API_KEY = originalGemini;

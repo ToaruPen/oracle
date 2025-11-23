@@ -23,6 +23,7 @@ import {
 import { sessionStore } from '../sessionStore.js';
 import { runMultiModelApiSession } from '../oracle/multiModelRunner.js';
 import { MODEL_CONFIGS, DEFAULT_SYSTEM_PROMPT } from '../oracle/config.js';
+import { isKnownModel } from '../oracle/modelResolver.js';
 import { resolveModelConfig } from '../oracle/modelResolver.js';
 import { buildPrompt, buildRequestBody } from '../oracle/request.js';
 import { estimateRequestTokens } from '../oracle/tokenEstimate.js';
@@ -168,7 +169,9 @@ export async function performSessionRun({
       }
 
       // Surface long-running model expectations up front so users know why a response might lag.
-      const longRunningModels = multiModels.filter((model) => MODEL_CONFIGS[model]?.reasoning?.effort === 'high');
+      const longRunningModels = multiModels.filter(
+        (model) => isKnownModel(model) && MODEL_CONFIGS[model]?.reasoning?.effort === 'high',
+      );
       if (longRunningModels.length > 0) {
         for (const model of longRunningModels) {
           log('');

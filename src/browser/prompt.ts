@@ -9,6 +9,7 @@ import {
   TOKENIZER_OPTIONS,
   formatFileSection,
 } from '../oracle.js';
+import { isKnownModel } from '../oracle/modelResolver.js';
 import { buildPromptMarkdown } from '../oracle/promptAssembly.js';
 import type { BrowserAttachment } from './types.js';
 import { buildAttachmentPlan } from './policies.js';
@@ -77,7 +78,8 @@ export async function assembleBrowserPrompt(
     });
   }
   const inlineFileCount = attachmentPlan.inlineFileCount;
-  const tokenizer = MODEL_CONFIGS[runOptions.model].tokenizer;
+  const modelConfig = isKnownModel(runOptions.model) ? MODEL_CONFIGS[runOptions.model] : MODEL_CONFIGS['gpt-5.1'];
+  const tokenizer = modelConfig.tokenizer;
   const tokenizerUserContent =
     inlineFileCount > 0 && attachmentPlan.inlineBlock
       ? [userPrompt, attachmentPlan.inlineBlock].filter((value) => Boolean(value?.trim())).join('\n\n').trim()

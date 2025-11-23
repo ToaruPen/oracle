@@ -17,6 +17,7 @@ import chalk from 'chalk';
 import type { SessionMetadata, SessionMode, BrowserSessionConfig } from '../src/sessionStore.js';
 import { sessionStore, pruneOldSessions } from '../src/sessionStore.js';
 import { DEFAULT_MODEL, MODEL_CONFIGS, runOracle, readFiles, estimateRequestTokens, buildRequestBody } from '../src/oracle.js';
+import { isKnownModel } from '../src/oracle/modelResolver.js';
 import type { ModelName, PreviewMode, RunOracleOptions } from '../src/oracle.js';
 import { CHATGPT_URL, normalizeChatgptUrl } from '../src/browserMode.js';
 import { createRemoteBrowserExecutor } from '../src/remote/client.js';
@@ -775,7 +776,9 @@ async function runRootCommand(options: CliOptions): Promise<void> {
     normalizedMultiModels[0] ?? (isGemini ? resolveApiModel(cliModelArg) : resolvedModelCandidate);
   const effectiveModelId = resolvedModel.startsWith('gemini')
     ? resolveGeminiModelId(resolvedModel)
-    : MODEL_CONFIGS[resolvedModel]?.apiModel ?? resolvedModel;
+    : isKnownModel(resolvedModel)
+      ? MODEL_CONFIGS[resolvedModel].apiModel ?? resolvedModel
+      : resolvedModel;
   const resolvedBaseUrl = normalizeBaseUrl(
     options.baseUrl ?? (isClaude ? process.env.ANTHROPIC_BASE_URL : process.env.OPENAI_BASE_URL),
   );
@@ -823,7 +826,7 @@ async function runRootCommand(options: CliOptions): Promise<void> {
       { prompt: options.prompt, file: options.file, system: options.system },
       { cwd: process.cwd() },
     );
-    const modelConfig = MODEL_CONFIGS[resolvedModel];
+    const modelConfig = isKnownModel(resolvedModel) ? MODEL_CONFIGS[resolvedModel] : MODEL_CONFIGS['gpt-5.1'];
     const requestBody = buildRequestBody({
       modelConfig,
       systemPrompt: bundle.systemPrompt,

@@ -106,15 +106,13 @@ export async function runOracle(options: RunOracleOptions, deps: RunOracleDeps =
     (provider === 'xai' && !hasXaiKey) ||
     provider === 'other';
   const openRouterFallback = providerKeyMissing && Boolean(openRouterApiKey);
-  let baseUrlIsOpenRouter = isOpenRouterBaseUrl(baseUrl);
   if (!baseUrl || openRouterFallback) {
     if (openRouterFallback) {
       baseUrl = defaultOpenRouterBase;
     }
   }
-  if (isOpenRouterBaseUrl(baseUrl)) {
+  if (baseUrl && isOpenRouterBaseUrl(baseUrl)) {
     baseUrl = normalizeOpenRouterBaseUrl(baseUrl);
-    baseUrlIsOpenRouter = true;
   }
 
   const logVerbose = (message: string): void => {

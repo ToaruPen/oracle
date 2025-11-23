@@ -10,6 +10,7 @@ import {
   type RunOracleOptions,
   type PreviewMode,
 } from '../oracle.js';
+import { isKnownModel } from '../oracle/modelResolver.js';
 import { assembleBrowserPrompt, type BrowserPromptArtifacts } from '../browser/prompt.js';
 import type { BrowserAttachment } from '../browser/types.js';
 import type { BrowserSessionConfig } from '../sessionStore.js';
@@ -64,7 +65,8 @@ async function runApiDryRun(
   const files = await readFilesImpl(runOptions.file ?? [], { cwd });
   const systemPrompt = runOptions.system?.trim() || DEFAULT_SYSTEM_PROMPT;
   const combinedPrompt = buildPrompt(runOptions.prompt ?? '', files, cwd);
-  const tokenizer = MODEL_CONFIGS[runOptions.model].tokenizer;
+  const modelConfig = isKnownModel(runOptions.model) ? MODEL_CONFIGS[runOptions.model] : MODEL_CONFIGS['gpt-5.1'];
+  const tokenizer = modelConfig.tokenizer;
   const estimatedInputTokens = tokenizer(
     [
       { role: 'system', content: systemPrompt },
@@ -78,7 +80,7 @@ async function runApiDryRun(
     log(chalk.dim('[dry-run] No files matched the provided --file patterns.'));
     return;
   }
-  const inputBudget = runOptions.maxInput ?? MODEL_CONFIGS[runOptions.model].inputLimit;
+  const inputBudget = runOptions.maxInput ?? modelConfig.inputLimit;
   const stats = getFileTokenStats(files, {
     cwd,
     tokenizer,
