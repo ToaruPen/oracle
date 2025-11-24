@@ -392,8 +392,11 @@ function canSpawn(cmd: string): boolean {
       const result = spawnSync('where', [cmd], { stdio: 'ignore' });
       return result.status === 0;
     }
-    const result = spawnSync('command', ['-v', cmd], { stdio: 'ignore' });
-    return result.status === 0;
+    // `command -v` is a shell builtin; run through sh. Fallback to `which`.
+    const shResult = spawnSync('sh', ['-c', `command -v ${cmd}`], { stdio: 'ignore' });
+    if (shResult.status === 0) return true;
+    const whichResult = spawnSync('which', [cmd], { stdio: 'ignore' });
+    return whichResult.status === 0;
   } catch {
     return false;
   }
