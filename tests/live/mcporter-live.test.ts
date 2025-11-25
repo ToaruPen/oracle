@@ -7,6 +7,8 @@ import path from 'node:path';
 const execFileAsync = promisify(execFile);
 const LIVE = process.env.ORACLE_LIVE_TEST === '1';
 const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+const baseUrl = process.env.OPENAI_BASE_URL ?? '';
+const isOpenRouterBase = baseUrl.includes('openrouter');
 const MCP_CONFIG = path.join(process.cwd(), 'config', 'mcporter.json');
 const ORACLE_MCP_BIN = path.join(process.cwd(), 'dist', 'bin', 'oracle-mcp.js');
 
@@ -14,7 +16,7 @@ async function assertBuiltArtifacts(): Promise<void> {
   await stat(ORACLE_MCP_BIN);
 }
 
-(LIVE && hasOpenAI ? describe : describe.skip)('mcporter live (stdio oracle-mcp)', () => {
+(LIVE && hasOpenAI && !isOpenRouterBase ? describe : describe.skip)('mcporter live (stdio oracle-mcp)', () => {
   it(
     'lists oracle-local schema',
     async () => {

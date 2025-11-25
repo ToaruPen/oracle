@@ -9,13 +9,18 @@ import { sessionStore } from '../../src/sessionStore.js';
 import type { ModelName } from '../../src/oracle.js';
 
 const live = process.env.ORACLE_LIVE_TEST === '1';
+const baseUrl = process.env.OPENAI_BASE_URL ?? '';
+const isOpenRouterBase = baseUrl.includes('openrouter');
 const hasKeys =
-  Boolean(process.env.OPENAI_API_KEY) && Boolean(process.env.GEMINI_API_KEY) && Boolean(process.env.ANTHROPIC_API_KEY);
+  Boolean(process.env.OPENAI_API_KEY) &&
+  Boolean(process.env.GEMINI_API_KEY) &&
+  Boolean(process.env.ANTHROPIC_API_KEY) &&
+  !isOpenRouterBase;
 const execFileAsync = promisify(execFile);
 const TSX_BIN = path.join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const CLI_ENTRY = path.join(process.cwd(), 'bin', 'oracle-cli.ts');
 
-(live ? describe : describe.skip)('Multi-model live smoke (GPT + Gemini + Claude)', () => {
+(live && !isOpenRouterBase ? describe : describe.skip)('Multi-model live smoke (GPT + Gemini + Claude)', () => {
   if (!hasKeys) {
     it.skip('requires OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY', () => {});
     return;

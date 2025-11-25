@@ -7,11 +7,13 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import type { RunOracleOptions } from '../../src/oracle.ts';
 import type { SessionMetadata } from '../../src/sessionManager.ts';
 
-const ENABLE_LIVE = process.env.ORACLE_LIVE_TEST === '1' && process.env.OPENAI_API_KEY;
+const baseUrl = process.env.OPENAI_BASE_URL ?? '';
+const isOpenRouterBase = baseUrl.includes('openrouter');
+const ENABLE_LIVE = process.env.ORACLE_LIVE_TEST === '1' && process.env.OPENAI_API_KEY && !isOpenRouterBase;
 
 if (!ENABLE_LIVE) {
   describe.skip('write-output live e2e', () => {
-    test('Set ORACLE_LIVE_TEST=1 with a real OPENAI_API_KEY to run this suite.', () => {});
+    test('Set ORACLE_LIVE_TEST=1 with a real OPENAI_API_KEY (api.openai.com) to run this suite.', () => {});
   });
 } else {
   describe('write-output live e2e', () => {

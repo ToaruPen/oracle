@@ -7,6 +7,8 @@ import path from 'node:path';
 const execFileAsync = promisify(execFile);
 const LIVE = process.env.ORACLE_LIVE_TEST === '1';
 const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+const baseUrl = process.env.OPENAI_BASE_URL ?? '';
+const isOpenRouterBase = baseUrl.includes('openrouter');
 const MCP_CONFIG = path.join(process.cwd(), 'config', 'mcporter.json');
 const ORACLE_MCP_BIN = path.join(process.cwd(), 'dist', 'bin', 'oracle-mcp.js');
 
@@ -54,7 +56,7 @@ function extractSessionId(output: McporterOutput): string | null {
   return null;
 }
 
-(LIVE && hasOpenAI ? describe : describe.skip)('mcporter sessions live', () => {
+(LIVE && hasOpenAI && !isOpenRouterBase ? describe : describe.skip)('mcporter sessions live', () => {
   it(
     'creates a session via consult then fetches it via sessions tool',
     async () => {
