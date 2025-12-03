@@ -558,9 +558,9 @@ async function waitForLogin({
   throw new Error('Manual login mode timed out waiting for ChatGPT session; please sign in and retry.');
 }
 
-async function assertNavigatedToHttp(
+async function _assertNavigatedToHttp(
   runtime: ChromeClient['Runtime'],
-  logger: BrowserLogger,
+  _logger: BrowserLogger,
   timeoutMs = 10_000,
 ): Promise<string> {
   const deadline = Date.now() + timeoutMs;

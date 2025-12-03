@@ -1,4 +1,10 @@
 import OpenAI, { AzureOpenAI } from 'openai';
+import type {
+  ChatCompletion,
+  ChatCompletionChunk,
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionCreateParamsNonStreaming,
+} from 'openai/resources/chat/completions';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import type {
@@ -30,9 +36,8 @@ export function createDefaultClientFactory(): ClientFactory {
     }
 
     let instance: OpenAI;
-    const defaultHeaders: Record<string, string> | undefined = isOpenRouterBaseUrl(options?.baseUrl)
-      ? buildOpenRouterHeaders()
-      : undefined;
+    const openRouter = isOpenRouterBaseUrl(options?.baseUrl);
+    const defaultHeaders: Record<string, string> | undefined = openRouter ? buildOpenRouterHeaders() : undefined;
 
     if (options?.azure?.endpoint) {
       instance = new AzureOpenAI({
@@ -49,6 +54,10 @@ export function createDefaultClientFactory(): ClientFactory {
         baseURL: options?.baseUrl,
         defaultHeaders,
       });
+    }
+
+    if (openRouter) {
+      return buildOpenRouterCompletionClient(instance);
     }
 
     return {
@@ -123,3 +132,99 @@ function loadCustomClientFactory(): ClientFactory | null {
 
 // Exposed for tests
 export { loadCustomClientFactory as __loadCustomClientFactory };
+
+function buildOpenRouterCompletionClient(instance: OpenAI): ClientLike {
+  const adaptRequest = (body: OracleRequestBody) => {
+    const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [];
+    if (body.instructions) {
+      messages.push({ role: 'system', content: body.instructions });
+    }
+    for (const entry of body.input) {
+      const textParts = entry.content
+        .map((c) => (c.type === 'input_text' ? c.text : ''))
+        .filter((t) => t)
+        .join('\n\n');
+      messages.push({ role: (entry.role as 'user' | 'assistant' | 'system') ?? 'user', content: textParts });
+    }
+    const base = {
+      model: body.model,
+      messages,
+      max_tokens: body.max_output_tokens,
+    };
+    const streaming: ChatCompletionCreateParamsStreaming = { ...base, stream: true };
+    const nonStreaming: ChatCompletionCreateParamsNonStreaming = { ...base, stream: false };
+    return { streaming, nonStreaming };
+  };
+
+  const adaptResponse = (response: ChatCompletion): OracleResponse => {
+    const text = response.choices?.[0]?.message?.content ?? '';
+    const usage = {
+      input_tokens: response.usage?.prompt_tokens ?? 0,
+      output_tokens: response.usage?.completion_tokens ?? 0,
+      total_tokens: response.usage?.total_tokens ?? 0,
+    };
+    return {
+      id: response.id ?? `openrouter-${Date.now()}`,
+      status: 'completed',
+      output_text: [text],
+      output: [{ type: 'text', text }],
+      usage,
+    };
+  };
+
+  const stream = async (body: OracleRequestBody): Promise<ResponseStreamLike> => {
+    const { streaming } = adaptRequest(body);
+    let finalUsage: ChatCompletion['usage'] | undefined;
+    let finalId: string | undefined;
+    let aggregated = '';
+
+    async function* iterator() {
+      const completion = await instance.chat.completions.create(streaming);
+      for await (const chunk of completion as AsyncIterable<ChatCompletionChunk>) {
+        finalId = chunk.id ?? finalId;
+        const delta = chunk.choices?.[0]?.delta?.content ?? '';
+        if (delta) {
+          aggregated += delta;
+          yield { type: 'chunk', delta };
+        }
+        if (chunk.usage) {
+          finalUsage = chunk.usage;
+        }
+      }
+    }
+
+    const gen = iterator();
+
+    return {
+      [Symbol.asyncIterator]() {
+        return gen;
+      },
+      async finalResponse(): Promise<OracleResponse> {
+        return adaptResponse({
+          id: finalId ?? `openrouter-${Date.now()}`,
+          choices: [{ message: { role: 'assistant', content: aggregated } }],
+          usage: finalUsage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+          created: Math.floor(Date.now() / 1000),
+          model: '',
+          object: 'chat.completion',
+        } as ChatCompletion);
+      },
+    };
+  };
+
+  const create = async (body: OracleRequestBody): Promise<OracleResponse> => {
+    const { nonStreaming } = adaptRequest(body);
+    const response = (await instance.chat.completions.create(nonStreaming)) as ChatCompletion;
+    return adaptResponse(response);
+  };
+
+  return {
+    responses: {
+      stream,
+      create,
+      retrieve: async () => {
+        throw new Error('retrieve is not supported for OpenRouter chat/completions fallback.');
+      },
+    },
+  };
+}
