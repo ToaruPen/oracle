@@ -35,6 +35,7 @@ export async function launchTui({ version, printIntro = true }: LaunchTuiOptions
   const userConfig = (await loadUserConfig()).config;
   const rich = isTty();
   let pagingFailures = 0;
+  let exitMessageShown = false;
   if (printIntro) {
     if (rich) {
       console.log(chalk.bold('🧿 oracle'), `${version}`, dim('— Whispering your tokens to the silicon sage'));
@@ -98,6 +99,7 @@ export async function launchTui({ version, printIntro = true }: LaunchTuiOptions
           const message = error instanceof Error ? error.message : String(error);
           if (message.includes('SIGINT') || message.includes('force closed the prompt')) {
             console.log(chalk.green('🧿 Closing the book. See you next prompt.'));
+            exitMessageShown = true;
             resolve('__exit__');
             return;
           }
@@ -123,7 +125,9 @@ export async function launchTui({ version, printIntro = true }: LaunchTuiOptions
     pagingFailures = 0;
 
     if (selection === '__exit__') {
-      console.log(chalk.green('🧿 Closing the book. See you next prompt.'));
+      if (!exitMessageShown) {
+        console.log(chalk.green('🧿 Closing the book. See you next prompt.'));
+      }
       return;
     }
     if (selection === '__ask__') {
