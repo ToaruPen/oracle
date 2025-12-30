@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import JSON5 from 'json5';
 import { getOracleHomeDir } from './oracleHome.js';
-import type { BrowserModelStrategy } from './browser/types.js';
+import type { BrowserConversationCleanupMode, BrowserModelStrategy } from './browser/types.js';
 import type { ThinkingTimeLevel } from './oracle/types.js';
 
 export type EnginePreference = 'api' | 'browser';
@@ -32,6 +32,10 @@ export interface BrowserConfigDefaults {
   manualLogin?: boolean;
   /** Manual-login profile directory override (also available via ORACLE_BROWSER_PROFILE_DIR). */
   manualLoginProfileDir?: string | null;
+  /** Optional ChatGPT conversation cleanup after a successful browser run. */
+  cleanupConversation?: BrowserConversationCleanupMode;
+  /** Allow cleanup even when `chatgptUrl` targets a specific `/c/<id>` conversation (dangerous). */
+  cleanupConversationForce?: boolean;
 }
 
 export interface AzureConfig {

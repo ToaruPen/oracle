@@ -118,6 +118,8 @@ interface CliOptions extends OptionValues {
   browserHideWindow?: boolean;
   browserKeepBrowser?: boolean;
   browserModelStrategy?: 'select' | 'current' | 'ignore';
+  browserCleanupConversation?: 'none' | 'archive' | 'delete';
+  browserCleanupConversationForce?: boolean;
   browserManualLogin?: boolean;
   browserManualLoginProfileDir?: string;
   browserThinkingTime?: 'light' | 'standard' | 'extended' | 'heavy';
@@ -372,6 +374,20 @@ program
   .addOption(new Option('--browser-headless', 'Launch Chrome in headless mode.').hideHelp())
   .addOption(new Option('--browser-hide-window', 'Hide the Chrome window after launch (macOS headful only).').hideHelp())
   .addOption(new Option('--browser-keep-browser', 'Keep Chrome running after completion.').hideHelp())
+  .addOption(
+    new Option(
+      '--browser-cleanup-conversation <mode>',
+      'Optional ChatGPT history cleanup after a successful browser run: none (default) keeps the thread, archive hides it from the sidebar, delete attempts deletion (may fall back to archive).',
+    )
+      .choices(['none', 'archive', 'delete'])
+      .default('none'),
+  )
+  .addOption(
+    new Option(
+      '--browser-cleanup-conversation-force',
+      'Allow cleanupConversation even when --chatgpt-url points at a specific /c/<id> conversation (dangerous).',
+    ).default(false),
+  )
   .addOption(
     new Option(
       '--browser-model-strategy <mode>',

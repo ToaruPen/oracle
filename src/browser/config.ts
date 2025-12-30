@@ -1,6 +1,6 @@
 import { CHATGPT_URL, DEFAULT_MODEL_STRATEGY, DEFAULT_MODEL_TARGET } from './constants.js';
 import { normalizeBrowserModelStrategy } from './modelStrategy.js';
-import type { BrowserAutomationConfig, ResolvedBrowserConfig } from './types.js';
+import type { BrowserAutomationConfig, BrowserConversationCleanupMode, ResolvedBrowserConfig } from './types.js';
 import { isTemporaryChatUrl, normalizeChatgptUrl } from './utils.js';
 import os from 'node:os';
 import path from 'node:path';
@@ -25,6 +25,8 @@ export const DEFAULT_BROWSER_CONFIG: ResolvedBrowserConfig = {
   modelStrategy: DEFAULT_MODEL_STRATEGY,
   debug: false,
   allowCookieErrors: false,
+  cleanupConversation: 'none',
+  cleanupConversationForce: false,
   remoteChrome: null,
   manualLogin: false,
   manualLoginProfileDir: null,
@@ -38,6 +40,12 @@ export function resolveBrowserConfig(config: BrowserAutomationConfig | undefined
   const envAllowCookieErrors =
     (process.env.ORACLE_BROWSER_ALLOW_COOKIE_ERRORS ?? '').trim().toLowerCase() === 'true' ||
     (process.env.ORACLE_BROWSER_ALLOW_COOKIE_ERRORS ?? '').trim() === '1';
+  const envCleanupConversation =
+    normalizeCleanupConversationMode(process.env.ORACLE_BROWSER_CLEANUP_CONVERSATION) ??
+    DEFAULT_BROWSER_CONFIG.cleanupConversation;
+  const envCleanupForce =
+    parseBooleanEnv(process.env.ORACLE_BROWSER_CLEANUP_CONVERSATION_FORCE) ??
+    DEFAULT_BROWSER_CONFIG.cleanupConversationForce;
   const rawUrl = config?.chatgptUrl ?? config?.url ?? DEFAULT_BROWSER_CONFIG.url;
   const normalizedUrl = normalizeChatgptUrl(rawUrl ?? DEFAULT_BROWSER_CONFIG.url, DEFAULT_BROWSER_CONFIG.url);
   const desiredModel = config?.desiredModel ?? DEFAULT_BROWSER_CONFIG.desiredModel ?? DEFAULT_MODEL_TARGET;
@@ -58,6 +66,14 @@ export function resolveBrowserConfig(config: BrowserAutomationConfig | undefined
     config?.manualLoginProfileDir ??
     process.env.ORACLE_BROWSER_PROFILE_DIR ??
     path.join(os.homedir(), '.oracle', 'browser-profile');
+  const cleanupConversation =
+    normalizeCleanupConversationMode(config?.cleanupConversation) ??
+    envCleanupConversation ??
+    DEFAULT_BROWSER_CONFIG.cleanupConversation;
+  const cleanupConversationForce =
+    config?.cleanupConversationForce ??
+    envCleanupForce ??
+    DEFAULT_BROWSER_CONFIG.cleanupConversationForce;
   return {
     ...DEFAULT_BROWSER_CONFIG,
     ...(config ?? {}),
@@ -80,6 +96,8 @@ export function resolveBrowserConfig(config: BrowserAutomationConfig | undefined
     chromeCookiePath: config?.chromeCookiePath ?? DEFAULT_BROWSER_CONFIG.chromeCookiePath,
     debug: config?.debug ?? DEFAULT_BROWSER_CONFIG.debug,
     allowCookieErrors: config?.allowCookieErrors ?? envAllowCookieErrors ?? DEFAULT_BROWSER_CONFIG.allowCookieErrors,
+    cleanupConversation,
+    cleanupConversationForce,
     thinkingTime: config?.thinkingTime,
     manualLogin,
     manualLoginProfileDir: manualLogin ? resolvedProfileDir : null,
@@ -94,4 +112,24 @@ function parseDebugPort(raw?: string | null): number | null {
     return null;
   }
   return value;
+}
+
+function parseBooleanEnv(raw?: string | null): boolean | undefined {
+  const normalized = (raw ?? '').trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false;
+  return undefined;
+}
+
+function normalizeCleanupConversationMode(
+  raw: unknown,
+): BrowserConversationCleanupMode | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (['none', 'off', 'false', '0'].includes(normalized)) return 'none';
+  if (['archive', 'hide'].includes(normalized)) return 'archive';
+  if (['delete', 'remove'].includes(normalized)) return 'delete';
+  return undefined;
 }

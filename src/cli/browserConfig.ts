@@ -4,7 +4,7 @@ import type { BrowserSessionConfig } from '../sessionStore.js';
 import type { ModelName, ThinkingTimeLevel } from '../oracle.js';
 import { CHATGPT_URL, DEFAULT_MODEL_STRATEGY, DEFAULT_MODEL_TARGET, isTemporaryChatUrl, normalizeChatgptUrl, parseDuration } from '../browserMode.js';
 import { normalizeBrowserModelStrategy } from '../browser/modelStrategy.js';
-import type { BrowserModelStrategy } from '../browser/types.js';
+import type { BrowserConversationCleanupMode, BrowserModelStrategy } from '../browser/types.js';
 import type { CookieParam } from '../browser/types.js';
 import { getOracleHomeDir } from '../oracleHome.js';
 
@@ -48,6 +48,8 @@ export interface BrowserFlagOptions {
   browserThinkingTime?: ThinkingTimeLevel;
   browserModelLabel?: string;
   browserModelStrategy?: BrowserModelStrategy;
+  browserCleanupConversation?: BrowserConversationCleanupMode;
+  browserCleanupConversationForce?: boolean;
   browserAllowCookieErrors?: boolean;
   remoteChrome?: string;
   browserPort?: number;
@@ -144,6 +146,8 @@ export async function buildBrowserConfig(options: BrowserFlagOptions): Promise<B
     debug: options.verbose ? true : undefined,
     // Allow cookie failures by default so runs can continue without Chrome/Keychain secrets.
     allowCookieErrors: options.browserAllowCookieErrors ?? true,
+    cleanupConversation: options.browserCleanupConversation ?? undefined,
+    cleanupConversationForce: options.browserCleanupConversationForce ?? undefined,
     remoteChrome,
     thinkingTime: options.browserThinkingTime,
   };

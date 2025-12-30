@@ -692,6 +692,7 @@ export async function runBrowserMode(options: BrowserRunOptions): Promise<Browse
       // Bail out on mid-run disconnects so the session stays reattachable.
       throw new Error('Chrome disconnected before completion');
     }
+    await maybeCleanupConversation(Runtime, config, lastUrl, logger);
     stopThinkingMonitor?.();
     runStatus = 'complete';
     const durationMs = Date.now() - startedAt;
@@ -951,6 +952,7 @@ async function runRemoteBrowserMode(
         chromeHost: host,
         chromeTargetId: remoteTargetId ?? undefined,
         tabUrl: lastUrl,
+        conversationId: lastUrl ? extractConversationIdFromUrl(lastUrl) : undefined,
         controllerPid: process.pid,
       });
     } catch (error) {
@@ -1237,6 +1239,16 @@ async function runRemoteBrowserMode(
         answerMarkdown = bestText;
       }
     }
+    try {
+      const { result } = await Runtime.evaluate({ expression: 'location.href', returnByValue: true });
+      if (typeof result?.value === 'string') {
+        lastUrl = result.value;
+      }
+      await emitRuntimeHint();
+    } catch {
+      // ignore
+    }
+    await maybeCleanupConversation(Runtime, config, lastUrl, logger);
     stopThinkingMonitor?.();
 
     const durationMs = Date.now() - startedAt;
@@ -1505,6 +1517,170 @@ function isWsl(): boolean {
 function extractConversationIdFromUrl(url: string): string | undefined {
   const match = url.match(/\/c\/([a-zA-Z0-9-]+)/);
   return match?.[1];
+}
+
+async function maybeCleanupConversation(
+  Runtime: ChromeClient['Runtime'],
+  config: ReturnType<typeof resolveBrowserConfig>,
+  lastUrl: string | undefined,
+  logger: BrowserLogger,
+): Promise<void> {
+  const mode = (config.cleanupConversation ?? 'none').trim().toLowerCase();
+  if (!mode || mode === 'none' || mode === 'off' || mode === 'false' || mode === '0') {
+    return;
+  }
+
+  const conversationId = lastUrl ? extractConversationIdFromUrl(lastUrl) : undefined;
+  if (!conversationId) {
+    logger(`[browser] cleanupConversation=${mode} skipped (no conversationId)`);
+    return;
+  }
+
+  const baseTargetsConversation = Boolean(config.url) && config.url.includes('/c/');
+  if (baseTargetsConversation && !config.cleanupConversationForce) {
+    logger(
+      `[browser] cleanupConversation=${mode} skipped (target URL already includes /c/; set cleanupConversationForce to override)`,
+    );
+    return;
+  }
+
+  const runFetch = async (
+    expression: string,
+  ): Promise<{ ok?: boolean; status?: number; tokenPresent?: boolean; body?: string; error?: string } | null> => {
+    try {
+      const response = await Runtime.evaluate({ expression, awaitPromise: true, returnByValue: true });
+      const value = response.result?.value as unknown;
+      if (!value || typeof value !== 'object') return null;
+      return value as {
+        ok?: boolean;
+        status?: number;
+        tokenPresent?: boolean;
+        body?: string;
+        error?: string;
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, status: 0, error: message };
+    }
+  };
+
+  const patchVisibility = `(async () => {
+    const id = ${JSON.stringify(conversationId)};
+    const getAccessToken = async () => {
+      try {
+        const res = await fetch('/api/auth/session', { credentials: 'include', cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          const token =
+            data?.accessToken ||
+            data?.access_token ||
+            data?.token ||
+            data?.session?.accessToken ||
+            data?.session?.access_token ||
+            data?.session?.token ||
+            null;
+          if (typeof token === 'string' && token.trim()) return token.trim();
+        }
+      } catch {}
+      try {
+        const candidates = [
+          'accessToken',
+          'access_token',
+          'oai/accessToken',
+          'oai/access_token',
+          'oai-token',
+        ];
+        for (const key of candidates) {
+          const value = localStorage.getItem(key);
+          if (typeof value === 'string' && value.trim()) return value.trim();
+        }
+      } catch {}
+      return null;
+    };
+    const token = await getAccessToken();
+    const headers = { 'content-type': 'application/json', accept: 'application/json' };
+    if (token) headers['authorization'] = 'Bearer ' + token;
+    return fetch('/backend-api/conversation/' + id, {
+      method: 'PATCH',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ is_visible: false }),
+    }).then(async (res) => {
+      let body = '';
+      try { body = await res.text(); } catch {}
+      return { ok: res.ok, status: res.status, body: body.slice(0, 500), tokenPresent: Boolean(token) };
+    }).catch((err) => ({ ok: false, status: 0, error: String(err), tokenPresent: Boolean(token) }));
+  })()`;
+
+  const deleteConversation = `(async () => {
+    const id = ${JSON.stringify(conversationId)};
+    const getAccessToken = async () => {
+      try {
+        const res = await fetch('/api/auth/session', { credentials: 'include', cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          const token =
+            data?.accessToken ||
+            data?.access_token ||
+            data?.token ||
+            data?.session?.accessToken ||
+            data?.session?.access_token ||
+            data?.session?.token ||
+            null;
+          if (typeof token === 'string' && token.trim()) return token.trim();
+        }
+      } catch {}
+      try {
+        const candidates = [
+          'accessToken',
+          'access_token',
+          'oai/accessToken',
+          'oai/access_token',
+          'oai-token',
+        ];
+        for (const key of candidates) {
+          const value = localStorage.getItem(key);
+          if (typeof value === 'string' && value.trim()) return value.trim();
+        }
+      } catch {}
+      return null;
+    };
+    const token = await getAccessToken();
+    const headers = { accept: 'application/json' };
+    if (token) headers['authorization'] = 'Bearer ' + token;
+    return fetch('/backend-api/conversation/' + id, {
+      method: 'DELETE',
+      headers,
+      credentials: 'include',
+    }).then(async (res) => {
+      let body = '';
+      try { body = await res.text(); } catch {}
+      return { ok: res.ok, status: res.status, body: body.slice(0, 500), tokenPresent: Boolean(token) };
+    }).catch((err) => ({ ok: false, status: 0, error: String(err), tokenPresent: Boolean(token) }));
+  })()`;
+
+  if (mode === 'archive' || mode === 'hide') {
+    const result = await runFetch(patchVisibility);
+    logger(`[browser] cleanupConversation=${mode} status=${result?.status ?? 'unknown'} token=${result?.tokenPresent ? 'yes' : 'no'}`);
+    return;
+  }
+
+  if (mode === 'delete' || mode === 'remove') {
+    const deleted = await runFetch(deleteConversation);
+    if (deleted?.ok) {
+      logger(
+        `[browser] cleanupConversation=delete status=${deleted?.status ?? 'unknown'} token=${deleted?.tokenPresent ? 'yes' : 'no'}`,
+      );
+      return;
+    }
+    const archived = await runFetch(patchVisibility);
+    logger(
+      `[browser] cleanupConversation=delete failed (status=${deleted?.status ?? 'unknown'} token=${deleted?.tokenPresent ? 'yes' : 'no'}); archived instead (status=${archived?.status ?? 'unknown'} token=${archived?.tokenPresent ? 'yes' : 'no'})`,
+    );
+    return;
+  }
+
+  logger(`[browser] cleanupConversation=${mode} ignored (unknown mode; expected archive|delete|none)`);
 }
 
 async function resolveUserDataBaseDir(): Promise<string> {

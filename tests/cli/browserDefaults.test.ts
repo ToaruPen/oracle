@@ -113,6 +113,21 @@ describe('applyBrowserDefaultsFromConfig', () => {
     expect(options.browserManualLoginProfileDir).toBe('/tmp/oracle-profile');
   });
 
+  test('applies cleanupConversation defaults from config when CLI flags are untouched', () => {
+    const options: BrowserDefaultsOptions = {};
+    const config: UserConfig = {
+      browser: {
+        cleanupConversation: 'archive',
+        cleanupConversationForce: true,
+      },
+    };
+
+    applyBrowserDefaultsFromConfig(options, config, (_key) => 'default');
+
+    expect(options.browserCleanupConversation).toBe('archive');
+    expect(options.browserCleanupConversationForce).toBe(true);
+  });
+
   test('does not override manual-login when CLI enabled it', () => {
     const options: BrowserDefaultsOptions = { browserManualLogin: true };
     const config: UserConfig = {

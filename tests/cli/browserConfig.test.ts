@@ -29,6 +29,16 @@ describe('buildBrowserConfig', () => {
     expect(config.modelStrategy).toBe('current');
   });
 
+  test('passes cleanup conversation options through', async () => {
+    const config = await buildBrowserConfig({
+      model: 'gpt-5.2-pro',
+      browserCleanupConversation: 'archive',
+      browserCleanupConversationForce: true,
+    });
+    expect(config.cleanupConversation).toBe('archive');
+    expect(config.cleanupConversationForce).toBe(true);
+  });
+
   test('honors overrides and converts durations + booleans', async () => {
     const config = await buildBrowserConfig({
       model: 'gpt-5.1',

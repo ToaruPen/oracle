@@ -6,6 +6,7 @@ import type { ThinkingTimeLevel } from '../oracle/types.js';
 export type ChromeClient = Awaited<ReturnType<typeof CDP>>;
 export type CookieParam = Protocol.Network.CookieParam;
 export type BrowserModelStrategy = 'select' | 'current' | 'ignore';
+export type BrowserConversationCleanupMode = 'none' | 'archive' | 'delete';
 
 export type BrowserLogger = ((message: string) => void) & {
   verbose?: boolean;
@@ -38,6 +39,10 @@ export interface BrowserAutomationConfig {
   modelStrategy?: BrowserModelStrategy;
   debug?: boolean;
   allowCookieErrors?: boolean;
+  /** Optional ChatGPT conversation cleanup after a successful run (browser engine only). */
+  cleanupConversation?: BrowserConversationCleanupMode;
+  /** Allow cleanup even when `chatgptUrl` targets a specific `/c/<id>` conversation (dangerous). */
+  cleanupConversationForce?: boolean;
   remoteChrome?: { host: string; port: number } | null;
   manualLogin?: boolean;
   manualLoginProfileDir?: string | null;

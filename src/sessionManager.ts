@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import type { WriteStream } from 'node:fs';
 import net from 'node:net';
-import type { BrowserModelStrategy, CookieParam } from './browser/types.js';
+import type { BrowserConversationCleanupMode, BrowserModelStrategy, CookieParam } from './browser/types.js';
 import type { TransportFailureReason, AzureOptions, ModelName, ThinkingTimeLevel } from './oracle.js';
 import { DEFAULT_MODEL } from './oracle.js';
 import { safeModelSlug } from './oracle/modelResolver.js';
@@ -31,6 +31,8 @@ export interface BrowserSessionConfig {
   modelStrategy?: BrowserModelStrategy;
   debug?: boolean;
   allowCookieErrors?: boolean;
+  cleanupConversation?: BrowserConversationCleanupMode;
+  cleanupConversationForce?: boolean;
   remoteChrome?: { host: string; port: number } | null;
   manualLogin?: boolean;
   manualLoginProfileDir?: string | null;
