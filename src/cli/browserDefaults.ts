@@ -1,7 +1,7 @@
 import { normalizeChatgptUrl, CHATGPT_URL } from '../browserMode.js';
 import type { UserConfig } from '../config.js';
 import type { ThinkingTimeLevel } from '../oracle.js';
-import type { BrowserModelStrategy } from '../browser/types.js';
+import type { BrowserConversationCleanupMode, BrowserModelStrategy } from '../browser/types.js';
 
 export interface BrowserDefaultsOptions {
   chatgptUrl?: string;
@@ -19,6 +19,8 @@ export interface BrowserDefaultsOptions {
   browserThinkingTime?: ThinkingTimeLevel;
   browserManualLogin?: boolean;
   browserManualLoginProfileDir?: string | null;
+  browserCleanupConversation?: BrowserConversationCleanupMode;
+  browserCleanupConversationForce?: boolean;
 }
 
 type SourceGetter = (key: keyof BrowserDefaultsOptions) => string | undefined;
@@ -83,5 +85,11 @@ export function applyBrowserDefaultsFromConfig(
   }
   if (isUnset('browserManualLoginProfileDir') && browser.manualLoginProfileDir !== undefined) {
     options.browserManualLoginProfileDir = browser.manualLoginProfileDir;
+  }
+  if (isUnset('browserCleanupConversation') && browser.cleanupConversation !== undefined) {
+    options.browserCleanupConversation = browser.cleanupConversation;
+  }
+  if (isUnset('browserCleanupConversationForce') && browser.cleanupConversationForce !== undefined) {
+    options.browserCleanupConversationForce = browser.cleanupConversationForce;
   }
 }

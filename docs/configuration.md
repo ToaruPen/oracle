@@ -30,6 +30,8 @@ Oracle reads an optional per-user config from `~/.oracle/config.json`. The file 
     thinkingTime: "extended", // light | standard | extended | heavy (ChatGPT Thinking/Pro models)
     manualLogin: false,        // set true to reuse a persistent automation profile and sign in once (Windows defaults to true when unset)
     manualLoginProfileDir: null, // override profile dir (or set ORACLE_BROWSER_PROFILE_DIR)
+    cleanupConversation: "none", // none | archive | delete (browser only; archive hides the thread from the sidebar)
+    cleanupConversationForce: false, // allow cleanup even when chatgptUrl targets a specific /c/<id> (dangerous)
     headless: false,
     hideWindow: false,
     keepBrowser: false,
