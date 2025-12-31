@@ -5,6 +5,9 @@
 ### Added
 - Browser: add optional ChatGPT conversation cleanup (`--browser-cleanup-conversation` / `browser.cleanupConversation`) to auto-archive threads after browser runs and reduce sidebar clutter.
 
+### Fixed
+- Browser: apply inline cookies even when cookie sync is disabled (and during reattach), and fail fast when an inline cookie payload applies zero cookies.
+
 ## 0.8.2 — 2025-12-30
 
 ### Changed

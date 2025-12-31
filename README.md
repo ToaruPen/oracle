@@ -66,7 +66,9 @@ Engine auto-picks API when `OPENAI_API_KEY` is set, otherwise browser; browser i
 - Tip: set `browser.chatgptUrl` in config (or `--chatgpt-url`) to a dedicated ChatGPT project folder so browser runs don’t clutter your main history.
 
 **Codex skill**
-- Copy the bundled skill from this repo to your Codex skills folder:
+- Quick install (local repo checkout): `pnpm install && pnpm build && ./scripts/setup-local-agent.sh [--chatgpt-url <url>]`
+  - Installs `oracle-local` / `oracle-mcp-local` wrappers and copies the Codex skill to `~/.codex/skills/oracle`.
+- Manual install: copy the bundled skill from this repo to your Codex skills folder:
   - `mkdir -p ~/.codex/skills`
   - `cp -R skills/oracle ~/.codex/skills/oracle`
 - Then reference it in your `AGENTS.md`/`CLAUDE.md` so Codex loads it.

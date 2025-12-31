@@ -10,6 +10,7 @@ Use these steps to validate CLI + MCP end-to-end before releasing. The npm packa
 
 Shared prereqs
 - `pnpm build` (ensures `dist/bin/oracle-mcp.js` exists)
+- (Once) `./scripts/setup-local-agent.sh` (installs `oracle-local` / `oracle-mcp-local` wrappers for the `oracle-local` mcporter entry; ensure the chosen `~/bin`/`~/.local/bin` is on your `PATH`.)
 - `OPENAI_API_KEY` set in env
 - `config/mcporter.json` contains the `oracle` entry pointing to `npx -y @steipete/oracle oracle-mcp` (already committed).
 - mcporter available at `/Users/steipete/Library/pnpm/global/5/node_modules/.bin/mcporter`

@@ -35,7 +35,7 @@ Oracle reads an optional per-user config from `~/.oracle/config.json`. The file 
     headless: false,
     hideWindow: false,
     keepBrowser: false,
-    manualLoginCookieSync: false, // allow cookie sync even in manual-login mode
+    manualLoginCookieSync: false, // allow Chrome cookie sync even in manual-login mode (inline cookies always apply)
   },
 
   // Default target for `oracle serve` remote browser runs
