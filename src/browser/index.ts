@@ -216,37 +216,17 @@ export async function runBrowserMode(options: BrowserRunOptions): Promise<Browse
     }
 
     const manualLoginCookieSync = manualLogin && Boolean(config.manualLoginCookieSync);
+    const hasInlineCookies = Boolean(config.inlineCookies?.length);
     const cookieSyncEnabled = config.cookieSync && (!manualLogin || manualLoginCookieSync);
-    if (cookieSyncEnabled) {
+
+    if (hasInlineCookies) {
+      logger('Applying inline cookies (skipping Chrome profile read and Keychain prompt)');
+    } else if (cookieSyncEnabled) {
       if (manualLoginCookieSync) {
         logger('Manual login mode: seeding persistent profile with cookies from your Chrome profile.');
       }
-      if (!config.inlineCookies) {
-        logger(
-          'Heads-up: macOS may prompt for your Keychain password to read Chrome cookies; use --copy or --render for manual flow.',
-      );
-    } else {
-      logger('Applying inline cookies (skipping Chrome profile read and Keychain prompt)');
-    }
-    // Learned: always sync cookies before the first navigation so /backend-api/me succeeds.
-    const cookieCount = await syncCookies(Network, config.url, config.chromeProfile, logger, {
-      allowErrors: config.allowCookieErrors ?? false,
-      filterNames: config.cookieNames ?? undefined,
-      inlineCookies: config.inlineCookies ?? undefined,
-      cookiePath: config.chromeCookiePath ?? undefined,
-      });
-      appliedCookies = cookieCount;
-      if (config.inlineCookies && cookieCount === 0) {
-        throw new Error('No inline cookies were applied; aborting before navigation.');
-      }
       logger(
-        cookieCount > 0
-          ? config.inlineCookies
-            ? `Applied ${cookieCount} inline cookies`
-            : `Copied ${cookieCount} cookies from Chrome profile ${config.chromeProfile ?? 'Default'}`
-          : config.inlineCookies
-            ? 'No inline cookies applied; continuing without session reuse'
-            : 'No Chrome cookies found; continuing without session reuse',
+        'Heads-up: macOS may prompt for your Keychain password to read Chrome cookies; use --copy or --render for manual flow.',
       );
     } else {
       logger(
@@ -256,7 +236,30 @@ export async function runBrowserMode(options: BrowserRunOptions): Promise<Browse
       );
     }
 
-    if (cookieSyncEnabled && !manualLogin && (appliedCookies ?? 0) === 0 && !config.inlineCookies) {
+    if (hasInlineCookies || cookieSyncEnabled) {
+      // Learned: always sync cookies before the first navigation so /backend-api/me succeeds.
+      const cookieCount = await syncCookies(Network, config.url, config.chromeProfile, logger, {
+        allowErrors: config.allowCookieErrors ?? false,
+        filterNames: config.cookieNames ?? undefined,
+        inlineCookies: config.inlineCookies ?? undefined,
+        cookiePath: config.chromeCookiePath ?? undefined,
+      });
+      appliedCookies = cookieCount;
+      if (hasInlineCookies && cookieCount === 0) {
+        throw new Error('No inline cookies were applied; aborting before navigation.');
+      }
+      logger(
+        cookieCount > 0
+          ? hasInlineCookies
+            ? `Applied ${cookieCount} inline cookies`
+            : `Copied ${cookieCount} cookies from Chrome profile ${config.chromeProfile ?? 'Default'}`
+          : hasInlineCookies
+            ? 'No inline cookies applied; continuing without session reuse'
+            : 'No Chrome cookies found; continuing without session reuse',
+      );
+    }
+
+    if (cookieSyncEnabled && !manualLogin && (appliedCookies ?? 0) === 0 && !hasInlineCookies) {
       // Learned: if the profile has no ChatGPT cookies, browser mode will just bounce to login.
       // Fail early so the user knows to sign in.
       throw new BrowserAutomationError(
