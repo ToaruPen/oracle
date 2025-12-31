@@ -180,14 +180,38 @@ async function resumeBrowserSessionViaNewChrome(
     await hideChromeWindow(chrome, logger);
   }
 
+  const manualLoginCookieSync = manualLogin && Boolean(resolved.manualLoginCookieSync);
+  const hasInlineCookies = Boolean(resolved.inlineCookies?.length);
+  const cookieSyncEnabled = resolved.cookieSync && (!manualLogin || manualLoginCookieSync);
+
   let appliedCookies = 0;
-  if (!manualLogin && resolved.cookieSync) {
+  if (hasInlineCookies) {
+    logger('Applying inline cookies (skipping Chrome profile read and Keychain prompt)');
+  } else if (cookieSyncEnabled) {
+    if (manualLoginCookieSync) {
+      logger('Manual login mode: seeding persistent profile with cookies from your Chrome profile.');
+    }
+    logger(
+      'Heads-up: macOS may prompt for your Keychain password to read Chrome cookies; use --copy or --render for manual flow.',
+    );
+  } else {
+    logger(
+      manualLogin
+        ? 'Skipping Chrome cookie sync (--browser-manual-login enabled); reuse the opened profile after signing in.'
+        : 'Skipping Chrome cookie sync (--browser-no-cookie-sync)',
+    );
+  }
+
+  if (hasInlineCookies || cookieSyncEnabled) {
     appliedCookies = await syncCookies(Network, resolved.url, resolved.chromeProfile, logger, {
       allowErrors: resolved.allowCookieErrors,
       filterNames: resolved.cookieNames ?? undefined,
       inlineCookies: resolved.inlineCookies ?? undefined,
       cookiePath: resolved.chromeCookiePath ?? undefined,
     });
+    if (hasInlineCookies && appliedCookies === 0) {
+      throw new Error('No inline cookies were applied; aborting before navigation.');
+    }
   }
 
   await navigateToChatGPT(Page, Runtime, CHATGPT_URL, logger);
