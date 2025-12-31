@@ -1,12 +1,18 @@
 # Changelog
 
+## 0.8.2-toarupen.2 — 2025-12-31
+
+### Fixed
+- Browser: apply inline cookies even when cookie sync is disabled (and during reattach), and fail fast when an inline cookie payload applies zero cookies.
+
+### Docs
+- Browser mode: clarify cookie sync vs inline cookies (including manual-login and `--browser-no-cookie-sync`).
+- Development: document `scripts/setup-local-agent.sh` to install local `oracle-local` wrappers + Codex skill.
+
 ## 0.8.2-toarupen.1 — 2025-12-31
 
 ### Added
 - Browser: add optional ChatGPT conversation cleanup (`--browser-cleanup-conversation` / `browser.cleanupConversation`) to auto-archive threads after browser runs and reduce sidebar clutter.
-
-### Fixed
-- Browser: apply inline cookies even when cookie sync is disabled (and during reattach), and fail fast when an inline cookie payload applies zero cookies.
 
 ## 0.8.2 — 2025-12-30
 
