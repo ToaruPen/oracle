@@ -31,8 +31,10 @@ export async function submitPrompt(
   },
   prompt: string,
   logger: BrowserLogger,
-) : Promise<number | null> {
+): Promise<number | null> {
   const { runtime, input } = deps;
+  const primarySelectorLiteral = JSON.stringify(PROMPT_PRIMARY_SELECTOR);
+  const fallbackSelectorLiteral = JSON.stringify(PROMPT_FALLBACK_SELECTOR);
 
   await waitForDomReady(runtime, logger, deps.inputTimeoutMs ?? undefined);
   const encodedPrompt = JSON.stringify(prompt);
@@ -40,6 +42,16 @@ export async function submitPrompt(
     expression: `(() => {
       ${buildClickDispatcher()}
       const SELECTORS = ${JSON.stringify(INPUT_SELECTORS)};
+      const isVisible = (node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        const style = window.getComputedStyle(node);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.pointerEvents === 'none') {
+          return false;
+        }
+        const rect = node.getBoundingClientRect?.();
+        if (!rect) return false;
+        return rect.width > 8 && rect.height > 8;
+      };
       const focusNode = (node) => {
         if (!node) {
           return false;
@@ -61,12 +73,22 @@ export async function submitPrompt(
         return true;
       };
 
+      let fallbackNode = null;
       for (const selector of SELECTORS) {
-        const node = document.querySelector(selector);
-        if (!node) continue;
-        if (focusNode(node)) {
-          return { focused: true };
+        const nodes = Array.from(document.querySelectorAll(selector));
+        if (!nodes.length) continue;
+        for (const node of nodes) {
+          if (!(node instanceof HTMLElement)) continue;
+          if (node.hasAttribute('disabled') || node.getAttribute('aria-disabled') === 'true') continue;
+          if (!fallbackNode) fallbackNode = node;
+          if (!isVisible(node)) continue;
+          if (focusNode(node)) {
+            return { focused: true };
+          }
         }
+      }
+      if (fallbackNode && focusNode(fallbackNode)) {
+        return { focused: true, fallback: true };
       }
       return { focused: false };
     })()`,
@@ -78,14 +100,36 @@ export async function submitPrompt(
     throw new Error('Failed to focus prompt textarea');
   }
 
+  await runtime
+    .evaluate({
+      expression: `(() => {
+        const fallback = document.querySelector(${fallbackSelectorLiteral});
+        const editor = document.querySelector(${primarySelectorLiteral});
+        const cleared = { fallback: false, editor: false };
+        if (fallback) {
+          fallback.value = '';
+          fallback.dispatchEvent(new InputEvent('input', { bubbles: true, data: '', inputType: 'deleteByCut' }));
+          fallback.dispatchEvent(new Event('change', { bubbles: true }));
+          cleared.fallback = true;
+        }
+        if (editor) {
+          editor.textContent = '';
+          editor.dispatchEvent(new InputEvent('input', { bubbles: true, data: '', inputType: 'deleteByCut' }));
+          cleared.editor = true;
+        }
+        return cleared;
+      })()`,
+      returnByValue: true,
+    })
+    .catch(() => undefined);
+
+  await delay(150);
   await input.insertText({ text: prompt });
 
   // Some pages (notably ChatGPT when subscriptions/widgets load) need a brief settle
   // before the send button becomes enabled; give it a short breather to avoid races.
   await delay(500);
 
-  const primarySelectorLiteral = JSON.stringify(PROMPT_PRIMARY_SELECTOR);
-  const fallbackSelectorLiteral = JSON.stringify(PROMPT_FALLBACK_SELECTOR);
   const verification = await runtime.evaluate({
     expression: `(() => {
       const editor = document.querySelector(${primarySelectorLiteral});
@@ -102,7 +146,24 @@ export async function submitPrompt(
   const fallbackValueRaw = verification.result?.value?.fallbackValue ?? '';
   const editorTextTrimmed = editorTextRaw?.trim?.() ?? '';
   const fallbackValueTrimmed = fallbackValueRaw?.trim?.() ?? '';
-  if (!editorTextTrimmed && !fallbackValueTrimmed) {
+  if (!editorTextTrimmed && fallbackValueTrimmed) {
+    // Learned: some composer variants keep the prompt in a hidden textarea and don't update the
+    // contenteditable editor, which prevents the send button from appearing. Mirror the value.
+    await runtime
+      .evaluate({
+        expression: `(() => {
+          const fallback = document.querySelector(${fallbackSelectorLiteral});
+          const editor = document.querySelector(${primarySelectorLiteral});
+          const value = fallback?.value ?? '';
+          const editorText = editor?.innerText ?? editor?.textContent ?? '';
+          if (value && editor && !String(editorText).trim()) {
+            editor.textContent = value;
+            editor.dispatchEvent(new InputEvent('input', { bubbles: true, data: value, inputType: 'insertFromPaste' }));
+          }
+        })()`,
+      })
+      .catch(() => undefined);
+  } else if (!editorTextTrimmed && !fallbackValueTrimmed) {
     // Learned: occasionally Input.insertText doesn't land in the editor; force textContent/value + input events.
     await runtime.evaluate({
       expression: `(() => {
@@ -366,7 +427,7 @@ async function verifyPromptCommitted(
         document.querySelector(${assistantSelectorLiteral}) ||
         document.querySelector('[data-testid*="assistant"]'),
       );
-      // Learned: composer clearing + stop button or assistant presence is a reliable fallback signal.
+      // Learned: composer clearing + stop button (active generation) is a reliable fallback signal.
       const editorValue = editor?.innerText ?? '';
       const fallbackValue = fallback?.value ?? '';
       const composerCleared = !(String(editorValue).trim() || String(fallbackValue).trim());
@@ -408,8 +469,10 @@ async function verifyPromptCommitted(
     }
     const fallbackCommit =
       info?.composerCleared &&
-      ((info?.stopVisible ?? false) ||
-        (info?.hasNewTurn && (info?.assistantVisible || info?.inConversation)));
+      // Only treat "composer cleared" as a successful commit if the UI shows an active generation.
+      // In existing chats the conversation DOM can populate after navigation, which would otherwise
+      // trigger false positives and cause multi-turn follow-ups to capture stale answers.
+      (info?.stopVisible ?? false);
     if (fallbackCommit) {
       return typeof turnsCount === 'number' && Number.isFinite(turnsCount) ? turnsCount : null;
     }

@@ -62,6 +62,56 @@ describe('runBrowserSessionExecution', () => {
     expect(log).toHaveBeenCalled();
   });
 
+  test('returns tabUrl + conversationId in runtime result', async () => {
+    const log = vi.fn();
+    const executeBrowser = vi.fn(async () => ({
+      answerText: 'ok',
+      answerMarkdown: 'ok',
+      tookMs: 1000,
+      answerTokens: 12,
+      answerChars: 2,
+      chromePid: 123,
+      chromePort: 9999,
+      chromeHost: '127.0.0.1',
+      userDataDir: '/tmp/profile',
+      chromeTargetId: 't-1',
+      tabUrl: 'https://chatgpt.com/c/foo',
+      controllerPid: 777,
+    }));
+    const result = await runBrowserSessionExecution(
+      {
+        runOptions: baseRunOptions,
+        browserConfig: baseConfig,
+        cwd: '/repo',
+        log,
+      },
+      {
+        assemblePrompt: async () => ({
+          markdown: 'prompt',
+          composerText: 'prompt',
+          estimatedInputTokens: 42,
+          attachments: [],
+          inlineFileCount: 0,
+          tokenEstimateIncludesInlineFiles: false,
+          attachmentsPolicy: 'auto',
+          attachmentMode: 'inline',
+          fallback: null,
+        }),
+        executeBrowser,
+      },
+    );
+    expect(result.runtime).toMatchObject({
+      chromePid: 123,
+      chromePort: 9999,
+      chromeHost: '127.0.0.1',
+      userDataDir: '/tmp/profile',
+      chromeTargetId: 't-1',
+      tabUrl: 'https://chatgpt.com/c/foo',
+      conversationId: 'foo',
+      controllerPid: 777,
+    });
+  });
+
   test('suppresses automation noise when not verbose', async () => {
     const log = vi.fn();
     const noisyLogger = vi.fn();

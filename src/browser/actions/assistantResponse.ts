@@ -22,7 +22,16 @@ function isAnswerNowPlaceholderText(normalized: string): boolean {
   if (text.includes('file upload request') && (text.includes('pro thinking') || text.includes('chatgpt said'))) {
     return true;
   }
-  return text.includes('answer now') && (text.includes('pro thinking') || text.includes('chatgpt said'));
+  const hasAnswerNowGate = text.includes('answer now') || text.includes('今すぐ回答');
+  if (!hasAnswerNowGate) {
+    return false;
+  }
+  const hasProThinkingContext =
+    text.includes('pro thinking') ||
+    text.includes('chatgpt said') ||
+    text.includes('思考中') ||
+    (text.includes('pro') && text.includes('thinking'));
+  return hasProThinkingContext;
 }
 
 export async function waitForAssistantResponse(
@@ -203,6 +212,10 @@ export function buildCopyExpressionForTest(
   meta: { messageId?: string | null; turnId?: string | null } = {},
 ): string {
   return buildCopyExpression(meta);
+}
+
+export function isAnswerNowPlaceholderTextForTest(value: string): boolean {
+  return isAnswerNowPlaceholderText(value);
 }
 
 async function recoverAssistantResponse(
@@ -482,7 +495,14 @@ function buildAssistantSnapshotExpression(minTurnIndex?: number): string {
       if (normalized.includes('file upload request') && (normalized.includes('pro thinking') || normalized.includes('chatgpt said'))) {
         return true;
       }
-      return normalized.includes('answer now') && (normalized.includes('pro thinking') || normalized.includes('chatgpt said'));
+      const hasAnswerNowGate = normalized.includes('answer now') || normalized.includes('今すぐ回答');
+      if (!hasAnswerNowGate) return false;
+      return (
+        normalized.includes('pro thinking') ||
+        normalized.includes('chatgpt said') ||
+        normalized.includes('思考中') ||
+        (normalized.includes('pro') && normalized.includes('thinking'))
+      );
     };
     if (extracted && extracted.text && !isPlaceholder(extracted)) {
       return extracted;
@@ -516,7 +536,14 @@ function buildResponseObserverExpression(timeoutMs: number, minTurnIndex?: numbe
       if (normalized.includes('file upload request') && (normalized.includes('pro thinking') || normalized.includes('chatgpt said'))) {
         return true;
       }
-      return normalized.includes('answer now') && (normalized.includes('pro thinking') || normalized.includes('chatgpt said'));
+      const hasAnswerNowGate = normalized.includes('answer now') || normalized.includes('今すぐ回答');
+      if (!hasAnswerNowGate) return false;
+      return (
+        normalized.includes('pro thinking') ||
+        normalized.includes('chatgpt said') ||
+        normalized.includes('思考中') ||
+        (normalized.includes('pro') && normalized.includes('thinking'))
+      );
     };
 
     // Helper to detect assistant turns - must match buildAssistantExtractor logic for consistency.

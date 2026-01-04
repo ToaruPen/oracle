@@ -62,13 +62,14 @@ export async function uploadAttachmentFile(
           return null;
         };
         const sendSelectors = ${JSON.stringify(SEND_BUTTON_SELECTORS)};
-        const attachmentSelectors = [
-          'input[type="file"]',
-          '[data-testid*="attachment"]',
-          '[data-testid*="upload"]',
-          '[aria-label*="Remove"]',
-          '[aria-label*="remove"]',
-        ];
+	    const attachmentSelectors = [
+	      'input[type="file"]',
+	      '[data-testid*="attachment"]',
+	      '[data-testid*="upload"]',
+	      '[aria-label*="Remove"]',
+	      '[aria-label*="remove"]',
+	      '[aria-label*="削除"]',
+	    ];
         const locateComposerRoot = () => {
           const promptNode = findPromptNode();
           if (promptNode) {
@@ -179,7 +180,7 @@ export async function uploadAttachmentFile(
           });
         });
 
-        const countRegex = /(?:^|\\b)(\\d+)\\s+files?\\b/;
+        const countRegex = /(\\d+)\\s*(?:files?\\b|file\\b|[^\\d]{0,8}ファイル)/i;
         const collectFileCount = (candidates) => {
           let count = 0;
           for (const node of candidates) {
@@ -213,7 +214,8 @@ export async function uploadAttachmentFile(
             let hasFileHint = false;
             for (const raw of values) {
               if (!raw) continue;
-              if (normalize(raw).includes('file')) {
+              const normalized = normalize(raw);
+              if (normalized.includes('file') || normalized.includes('ファイル')) {
                 hasFileHint = true;
                 break;
               }
@@ -301,8 +303,11 @@ export async function uploadAttachmentFile(
           'button[data-testid="composer-plus-btn"]',
           '[data-testid*="plus"]',
           'button[aria-label*="add"]',
+          'button[aria-label*="追加"]',
           'button[aria-label*="attachment"]',
+          'button[aria-label*="添付"]',
           'button[aria-label*="file"]',
+          'button[aria-label*="ファイル"]',
         ];
         for (const selector of selectors) {
           const el = document.querySelector(selector);
@@ -327,7 +332,15 @@ export async function uploadAttachmentFile(
         for (const el of menuItems) {
           const text = (el.textContent || '').toLowerCase();
           const tid = el.getAttribute?.('data-testid')?.toLowerCase?.() || '';
-          if (tid.includes('upload') || tid.includes('attachment') || text.includes('upload') || text.includes('file')) {
+          if (
+            tid.includes('upload') ||
+            tid.includes('attachment') ||
+            text.includes('upload') ||
+            text.includes('file') ||
+            text.includes('アップロード') ||
+            text.includes('ファイル') ||
+            text.includes('添付')
+          ) {
             if (el instanceof HTMLElement) { el.click(); return true; }
           }
         }
@@ -472,7 +485,8 @@ export async function uploadAttachmentFile(
         return parts.length > 0 && parts.every((p) => p.startsWith('image/'));
       };
       const chipContainer = scope ?? document;
-        const chipSelector = '[data-testid*="attachment"],[data-testid*="chip"],[data-testid*="upload"],[data-testid*="file"],[aria-label*="Remove"],[aria-label*="remove"]';
+        const chipSelector =
+          '[data-testid*="attachment"],[data-testid*="chip"],[data-testid*="upload"],[data-testid*="file"],[aria-label*="Remove"],[aria-label*="remove"],[aria-label*="削除"]';
       const baselineChipCount = chipContainer.querySelectorAll(chipSelector).length;
       const baselineChips = Array.from(chipContainer.querySelectorAll(chipSelector))
         .slice(0, 20)
@@ -494,7 +508,7 @@ export async function uploadAttachmentFile(
           return /\\buploading\\b/.test(text) || /\\bprocessing\\b/.test(text);
         });
       });
-      const countRegex = /(?:^|\\b)(\\d+)\\s+files?\\b/;
+      const countRegex = /(\\d+)\\s*(?:files?\\b|file\\b|[^\\d]{0,8}ファイル)/i;
       const collectFileCount = (candidates) => {
         let count = 0;
         for (const node of candidates) {
@@ -528,7 +542,8 @@ export async function uploadAttachmentFile(
           let hasFileHint = false;
           for (const raw of values) {
             if (!raw) continue;
-            if (String(raw).toLowerCase().includes('file')) {
+            const lowered = String(raw).toLowerCase();
+            if (lowered.includes('file') || lowered.includes('ファイル')) {
               hasFileHint = true;
               break;
             }
@@ -1286,14 +1301,16 @@ export async function waitForAttachmentCompletion(
         return /\buploading\b/.test(text) || /\bprocessing\b/.test(text);
       });
     });
-    const attachmentChipSelectors = [
-      '[data-testid*="chip"]',
-      '[data-testid*="attachment"]',
-      '[data-testid*="upload"]',
-      '[data-testid*="file"]',
-      '[aria-label*="Remove"]',
-      'button[aria-label*="Remove"]',
-    ];
+	    const attachmentChipSelectors = [
+	      '[data-testid*="chip"]',
+	      '[data-testid*="attachment"]',
+	      '[data-testid*="upload"]',
+	      '[data-testid*="file"]',
+	      '[aria-label*="Remove"]',
+	      'button[aria-label*="Remove"]',
+	      '[aria-label*="remove"]',
+	      '[aria-label*="削除"]',
+	    ];
     const attachedNames = [];
     for (const selector of attachmentChipSelectors) {
       for (const node of Array.from(composerScope.querySelectorAll(selector))) {
@@ -1308,9 +1325,11 @@ export async function waitForAttachmentCompletion(
         }
       }
     }
-    const cardTexts = Array.from(composerScope.querySelectorAll('[aria-label*="Remove"]')).map((btn) =>
-      btn?.parentElement?.parentElement?.innerText?.toLowerCase?.() ?? '',
-    );
+	    const cardTexts = Array.from(
+	      composerScope.querySelectorAll('[aria-label*="Remove"],[aria-label*="remove"],[aria-label*="削除"]'),
+	    ).map((btn) =>
+	      btn?.parentElement?.parentElement?.innerText?.toLowerCase?.() ?? '',
+	    );
     attachedNames.push(...cardTexts.filter(Boolean));
 
     const inputNames = [];
@@ -1329,7 +1348,7 @@ export async function waitForAttachmentCompletion(
         if (file?.name) inputNames.push(file.name.toLowerCase());
       }
     }
-    const countRegex = /(?:^|\\b)(\\d+)\\s+files?\\b/;
+    const countRegex = /(\\d+)\\s*(?:files?\\b|file\\b|[^\\d]{0,8}ファイル)/i;
     const fileCountSelectors = [
       'button',
       '[role="button"]',
@@ -1375,7 +1394,8 @@ export async function waitForAttachmentCompletion(
         let hasFileHint = false;
         for (const raw of candidates) {
           if (!raw) continue;
-          if (String(raw).toLowerCase().includes('file')) {
+          const lowered = String(raw).toLowerCase();
+          if (lowered.includes('file') || lowered.includes('ファイル')) {
             hasFileHint = true;
             break;
           }
@@ -1575,8 +1595,8 @@ export async function waitForUserTurnAttachments(
     ];
     const hasAttachmentUi =
       lastUser.querySelectorAll(attachmentSelectors.join(',')).length > 0 ||
-      attrs.some((attr) => attr.includes('file') || attr.includes('attachment'));
-    const countRegex = /(?:^|\\b)(\\d+)\\s+files?\\b/;
+      attrs.some((attr) => attr.includes('file') || attr.includes('attachment') || attr.includes('ファイル') || attr.includes('添付'));
+    const countRegex = /(\\d+)\\s*(?:files?\\b|file\\b|[^\\d]{0,8}ファイル)/i;
     const fileCountNodes = Array.from(lastUser.querySelectorAll('button,span,div,[aria-label],[title]'));
     let fileCount = 0;
     for (const node of fileCountNodes) {
@@ -1592,7 +1612,8 @@ export async function waitForUserTurnAttachments(
       let hasFileHint = false;
       for (const raw of candidates) {
         if (!raw) continue;
-        if (String(raw).toLowerCase().includes('file')) {
+        const lowered = String(raw).toLowerCase();
+        if (lowered.includes('file') || lowered.includes('ファイル')) {
           hasFileHint = true;
           break;
         }
@@ -1666,6 +1687,14 @@ export async function waitForAttachmentVisible(
     const expected = ${JSON.stringify(expectedName)};
     const normalized = expected.toLowerCase();
     const normalizedNoExt = normalized.replace(/\\.[a-z0-9]{1,10}$/i, '');
+    const matchesExpected = (value) => {
+      const text = String(value || '').toLowerCase();
+      if (!text) return false;
+      return (
+        text.includes(normalized) ||
+        (normalizedNoExt.length >= 6 && text.includes(normalizedNoExt))
+      );
+    };
     const matchNode = (node) => {
       if (!node) return false;
       if (node.tagName === 'INPUT' && node.type === 'file') return false;
@@ -1675,7 +1704,7 @@ export async function waitForAttachmentVisible(
       const testId = node.getAttribute?.('data-testid')?.toLowerCase?.() ?? '';
       const alt = node.getAttribute?.('alt')?.toLowerCase?.() ?? '';
       const candidates = [text, aria, title, testId, alt].filter(Boolean);
-      return candidates.some((value) => value.includes(normalized) || (normalizedNoExt.length >= 6 && value.includes(normalizedNoExt)));
+      return candidates.some(matchesExpected);
     };
 
     const attachmentSelectors = ['[data-testid*="attachment"]','[data-testid*="chip"]','[data-testid*="upload"]','[data-testid*="file"]'];
@@ -1686,14 +1715,25 @@ export async function waitForAttachmentVisible(
       return { found: true, source: 'attachments' };
     }
 
-    const cardTexts = Array.from(document.querySelectorAll('[aria-label*="Remove"]')).map((btn) =>
+    const cardTexts = Array.from(
+      document.querySelectorAll('[aria-label*="Remove"],[aria-label*="remove"],[aria-label*="削除"]'),
+    ).map((btn) =>
       btn?.parentElement?.parentElement?.innerText?.toLowerCase?.() ?? '',
     );
-    if (cardTexts.some((text) => text.includes(normalized) || (normalizedNoExt.length >= 6 && text.includes(normalizedNoExt)))) {
+    if (cardTexts.some(matchesExpected)) {
       return { found: true, source: 'attachment-cards' };
     }
 
-    const countRegex = /(?:^|\\b)(\\d+)\\s+files?\\b/;
+    const inputMatch = Array.from(document.querySelectorAll('input[type="file"]')).some((node) => {
+      if (!(node instanceof HTMLInputElement)) return false;
+      const names = Array.from(node.files || []).map((file) => file?.name ?? '');
+      return names.some(matchesExpected);
+    });
+    if (inputMatch) {
+      return { found: true, source: 'file-input' };
+    }
+
+    const countRegex = /(\\d+)\\s*(?:files?\\b|file\\b|[^\\d]{0,8}ファイル)/i;
     const fileCountNodes = (() => {
       const nodes = [];
       const seen = new Set();
@@ -1743,7 +1783,8 @@ export async function waitForAttachmentVisible(
       let hasFileHint = false;
       for (const raw of candidates) {
         if (!raw) continue;
-        if (String(raw).toLowerCase().includes('file')) {
+        const lowered = String(raw).toLowerCase();
+        if (lowered.includes('file') || lowered.includes('ファイル')) {
           hasFileHint = true;
           break;
         }
@@ -1811,7 +1852,8 @@ async function waitForAttachmentAnchored(
       '[data-testid*="chip"]',
       '[data-testid*="upload"]',
       '[aria-label*="Remove"]',
-      'button[aria-label*="Remove"]',
+      '[aria-label*="remove"]',
+      '[aria-label*="削除"]',
     ];
     for (const selector of selectors) {
       for (const node of Array.from(document.querySelectorAll(selector))) {
@@ -1824,13 +1866,25 @@ async function waitForAttachmentAnchored(
         }
       }
     }
-    const cards = Array.from(document.querySelectorAll('[aria-label*="Remove"]')).map((btn) =>
+    const cards = Array.from(
+      document.querySelectorAll('[aria-label*="Remove"],[aria-label*="remove"],[aria-label*="削除"]'),
+    ).map((btn) =>
       btn?.parentElement?.parentElement?.innerText?.toLowerCase?.() ?? '',
     );
     if (cards.some(matchesExpected)) {
       return { found: true, text: cards.find(matchesExpected) };
     }
-    const countRegex = /(?:^|\\b)(\\d+)\\s+files?\\b/;
+
+    const inputMatch = Array.from(document.querySelectorAll('input[type="file"]')).some((node) => {
+      if (!(node instanceof HTMLInputElement)) return false;
+      const names = Array.from(node.files || []).map((file) => file?.name ?? '');
+      return names.some(matchesExpected);
+    });
+    if (inputMatch) {
+      return { found: true, text: 'file-input' };
+    }
+
+    const countRegex = /(\\d+)\\s*(?:files?\\b|file\\b|[^\\d]{0,8}ファイル)/i;
     const fileCountNodes = (() => {
       const nodes = [];
       const seen = new Set();
@@ -1880,7 +1934,8 @@ async function waitForAttachmentAnchored(
       let hasFileHint = false;
       for (const raw of candidates) {
         if (!raw) continue;
-        if (String(raw).toLowerCase().includes('file')) {
+        const lowered = String(raw).toLowerCase();
+        if (lowered.includes('file') || lowered.includes('ファイル')) {
           hasFileHint = true;
           break;
         }

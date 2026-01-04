@@ -23,6 +23,8 @@ Recommended defaults:
 - Browser engine: `--engine browser`
 - Pro model: `--model gpt-5.2-pro --browser-model-strategy select`
 - Keep ChatGPT history clean: `--browser-cleanup-conversation archive` (or `delete`, which may fall back to `archive`)
+- Pro UI note: never click “Answer now” / 「今すぐ回答」; wait for the real assistant answer
+- Concurrency note: avoid parallel browser runs with the same `--browser-manual-login` profile (`~/.oracle/browser-profile`); use distinct `ORACLE_BROWSER_PROFILE_DIR` per run or `--remote-chrome`
 
 ## Golden path
 
