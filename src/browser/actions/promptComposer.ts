@@ -209,7 +209,12 @@ export async function submitPrompt(
     });
   }
 
-  const clicked = await attemptSendButton(runtime, logger, deps?.attachmentNames);
+  const sendWaitMs = (() => {
+    const base = deps.inputTimeoutMs ?? 60_000;
+    const half = Math.floor(base * 0.5);
+    return Math.max(20_000, Math.min(60_000, half));
+  })();
+  const clicked = await attemptSendButton(runtime, logger, deps?.attachmentNames, sendWaitMs);
   if (!clicked) {
     await input.dispatchKeyEvent({
       type: 'keyDown',
@@ -321,19 +326,99 @@ export function buildAttachmentReadyExpressionForTest(attachmentNames: string[])
   return buildAttachmentReadyExpression(attachmentNames);
 }
 
-async function attemptSendButton(
-  Runtime: ChromeClient['Runtime'],
-  _logger?: BrowserLogger,
-  attachmentNames?: string[],
-): Promise<boolean> {
-  const script = `(() => {
+export function buildAttemptSendButtonExpressionForTest(): string {
+  return buildAttemptSendButtonExpression();
+}
+
+function buildAttemptSendButtonExpression(): string {
+  const primarySelectorLiteral = JSON.stringify(PROMPT_PRIMARY_SELECTOR);
+  const fallbackSelectorLiteral = JSON.stringify(PROMPT_FALLBACK_SELECTOR);
+  const fallbackSelectorsLiteral = JSON.stringify(
+    SEND_BUTTON_SELECTORS.filter((selector) => selector !== 'form button[type="submit"]'),
+  );
+  return `(() => {
     ${buildClickDispatcher()}
-    const selectors = ${JSON.stringify(SEND_BUTTON_SELECTORS)};
-    let button = null;
-    for (const selector of selectors) {
-      button = document.querySelector(selector);
-      if (button) break;
-    }
+    const editor = document.querySelector(${primarySelectorLiteral});
+    const fallback = document.querySelector(${fallbackSelectorLiteral});
+    const anchor = editor || fallback;
+
+    const hasPrompt = (node) => {
+      if (!node || typeof node.querySelector !== 'function') return false;
+      return Boolean(node.querySelector(${primarySelectorLiteral}) || node.querySelector(${fallbackSelectorLiteral}));
+    };
+
+    const resolveComposerScope = () => {
+      if (anchor && typeof anchor.closest === 'function') {
+        const form = anchor.closest('form');
+        if (form && hasPrompt(form)) return form;
+        const composer =
+          anchor.closest('[data-testid*="composer"]') ||
+          anchor.closest('[data-testid*="prompt"]') ||
+          null;
+        if (composer && hasPrompt(composer)) return composer;
+        if (anchor instanceof HTMLElement) {
+          const parent = anchor.parentElement;
+          if (parent && hasPrompt(parent)) return parent;
+        }
+      }
+      const forms = Array.from(document.querySelectorAll('form'));
+      for (const form of forms) {
+        if (hasPrompt(form)) return form;
+      }
+      const composers = Array.from(document.querySelectorAll('[data-testid*="composer"], [data-testid*="prompt"]'));
+      for (const composer of composers) {
+        if (hasPrompt(composer)) return composer;
+      }
+      return null;
+    };
+
+    const scope = resolveComposerScope();
+    const scopeHasPrompt = Boolean(scope && hasPrompt(scope));
+    const isVisible = (node) => {
+      if (!(node instanceof HTMLElement)) return false;
+      const style = window.getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.pointerEvents === 'none') {
+        return false;
+      }
+      const rect = node.getBoundingClientRect?.();
+      if (!rect) return false;
+      return rect.width > 4 && rect.height > 4;
+    };
+
+    const explicitSelectors = [
+      'button[data-testid="send-button"]',
+      'button[data-testid*="composer-send"]',
+      'button[type="submit"][data-testid*="send"]',
+      'button[aria-label*="Send"]',
+      'button[aria-label*="送信"]',
+    ];
+    const allowGenericSubmit = Boolean(anchor) && scopeHasPrompt;
+    const selectors = allowGenericSubmit ? [...explicitSelectors, 'button[type="submit"]'] : explicitSelectors;
+
+    const findButton = () => {
+      if (scope) {
+        for (const selector of selectors) {
+          const nodes = Array.from(scope.querySelectorAll(selector));
+          for (const node of nodes) {
+            if (isVisible(node)) {
+              return node;
+            }
+          }
+        }
+      }
+      // If we couldn't identify a safe composer scope, fall back only to explicit send selectors.
+      for (const selector of ${fallbackSelectorsLiteral}) {
+        const nodes = Array.from(document.querySelectorAll(selector));
+        for (const node of nodes) {
+          if (isVisible(node)) {
+            return node;
+          }
+        }
+      }
+      return null;
+    };
+
+    const button = findButton();
     if (!button) return 'missing';
     const ariaDisabled = button.getAttribute('aria-disabled');
     const dataDisabled = button.getAttribute('data-disabled');
@@ -350,8 +435,17 @@ async function attemptSendButton(
     dispatchClickSequence(button);
     return 'clicked';
   })()`;
+}
 
-  const deadline = Date.now() + 8_000;
+async function attemptSendButton(
+  Runtime: ChromeClient['Runtime'],
+  _logger?: BrowserLogger,
+  attachmentNames?: string[],
+  timeoutMs = 20_000,
+): Promise<boolean> {
+  const script = buildAttemptSendButtonExpression();
+
+  const deadline = Date.now() + Math.max(5_000, timeoutMs);
   while (Date.now() < deadline) {
     const needAttachment = Array.isArray(attachmentNames) && attachmentNames.length > 0;
     if (needAttachment) {
@@ -368,9 +462,8 @@ async function attemptSendButton(
     if (result.value === 'clicked') {
       return true;
     }
-    if (result.value === 'missing') {
-      break;
-    }
+    // Learned: hydration can briefly remove/replace the composer controls. If the send button is
+    // missing, keep polling until the deadline so we don't prematurely fall back to the Enter key.
     await delay(100);
   }
   return false;

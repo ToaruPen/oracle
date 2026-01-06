@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { buildAttachmentReadyExpressionForTest } from '../../src/browser/actions/promptComposer.ts';
+import {
+  buildAttachmentReadyExpressionForTest,
+  buildAttemptSendButtonExpressionForTest,
+} from '../../src/browser/actions/promptComposer.ts';
 
 describe('prompt composer attachment expressions', () => {
   test('attachment ready check does not match prompt text', () => {
@@ -12,3 +15,15 @@ describe('prompt composer attachment expressions', () => {
   });
 });
 
+describe('prompt composer send button expression', () => {
+  test('scopes send button lookup to the active composer', () => {
+    const expression = buildAttemptSendButtonExpressionForTest();
+    expect(expression).toContain("anchor.closest('form')");
+    expect(expression).toContain('scope.querySelectorAll(selector)');
+    expect(expression).toContain("'button[type=\"submit\"]'");
+    expect(expression).toContain('document.querySelector("#prompt-textarea")');
+    expect(expression).toContain('scopeHasPrompt');
+    expect(expression).toContain('allowGenericSubmit');
+    expect(expression).not.toContain('form button[type="submit"]');
+  });
+});

@@ -13,12 +13,26 @@ import { buildClickDispatcher } from './domEvents.js';
 
 const ASSISTANT_POLL_TIMEOUT_ERROR = 'assistant-response-watchdog-timeout';
 
-function isAnswerNowPlaceholderText(normalized: string): boolean {
-  const text = normalized.trim();
+const PLACEHOLDER_LABEL_ALWAYS_TEXT = ['chatgpt said', 'assistant said'] as const;
+const PLACEHOLDER_LABEL_GATE_TEXT = ['chatgpt', 'assistant'] as const;
+
+function isAnswerNowPlaceholderText(
+  normalized: string,
+  options?: { hasAnswerNowGate?: boolean },
+): boolean {
+  const text = normalized.trim().toLowerCase();
   if (!text) return false;
   // Learned: "Pro thinking" shows a placeholder turn that contains "Answer now".
   // That is not the final answer and must be ignored in browser automation.
-  if (text === 'chatgpt said:' || text === 'chatgpt said') return true;
+  const labelCandidate = text.replace(/[:：]+$/, '').trim();
+  if (PLACEHOLDER_LABEL_ALWAYS_TEXT.includes(labelCandidate as (typeof PLACEHOLDER_LABEL_ALWAYS_TEXT)[number])) {
+    return true;
+  }
+  if (PLACEHOLDER_LABEL_GATE_TEXT.includes(labelCandidate as (typeof PLACEHOLDER_LABEL_GATE_TEXT)[number])) {
+    if (options?.hasAnswerNowGate === true) {
+      return true;
+    }
+  }
   if (text.includes('file upload request') && (text.includes('pro thinking') || text.includes('chatgpt said'))) {
     return true;
   }
@@ -32,6 +46,50 @@ function isAnswerNowPlaceholderText(normalized: string): boolean {
     text.includes('思考中') ||
     (text.includes('pro') && text.includes('thinking'));
   return hasProThinkingContext;
+}
+
+function buildIsPlaceholderTextExpression(functionName: string): string {
+  const placeholdersAlwaysLiteral = JSON.stringify(PLACEHOLDER_LABEL_ALWAYS_TEXT);
+  const placeholdersGateLiteral = JSON.stringify(PLACEHOLDER_LABEL_GATE_TEXT);
+  return `const ${functionName} = (value, options) => {
+    const normalized = String(value ?? '').replace(/\\u00a0/g, ' ').toLowerCase().trim();
+    if (!normalized) return false;
+    const label = normalized.replace(/[:：]+$/, '').trim();
+    const LABEL_ALWAYS = ${placeholdersAlwaysLiteral};
+    const LABEL_GATE = ${placeholdersGateLiteral};
+    if (LABEL_ALWAYS.includes(label)) return true;
+    if (LABEL_GATE.includes(label)) {
+      if (options && options.hasAnswerNowGate === true) return true;
+    }
+    if (normalized.includes('file upload request') && (normalized.includes('pro thinking') || normalized.includes('chatgpt said'))) {
+      return true;
+    }
+    const hasAnswerNowGate = normalized.includes('answer now') || normalized.includes('今すぐ回答');
+    if (!hasAnswerNowGate) return false;
+    return (
+      normalized.includes('pro thinking') ||
+      normalized.includes('chatgpt said') ||
+      normalized.includes('思考中') ||
+      (normalized.includes('pro') && normalized.includes('thinking'))
+    );
+  };`;
+}
+
+function buildHasAnswerNowGateExpression(functionName: string): string {
+  return `const ${functionName} = () => {
+    const tokens = ['answer now', '今すぐ回答'];
+    const nodes = Array.from(document.querySelectorAll('button, [role="button"], a'));
+    for (const node of nodes) {
+      const label = (node.getAttribute?.('aria-label') || node.getAttribute?.('title') || node.textContent || '').toLowerCase();
+      for (const token of tokens) {
+        if (label.includes(token)) return true;
+      }
+    }
+    const bodyText = (document.body?.innerText || document.body?.textContent || '').toLowerCase();
+    if (tokens.some((token) => bodyText.includes(token))) return true;
+    if (bodyText.includes('pro thinking') || bodyText.includes('思考中')) return true;
+    return false;
+  };`;
 }
 
 export async function waitForAssistantResponse(
@@ -214,8 +272,18 @@ export function buildCopyExpressionForTest(
   return buildCopyExpression(meta);
 }
 
-export function isAnswerNowPlaceholderTextForTest(value: string): boolean {
-  return isAnswerNowPlaceholderText(value);
+export function isAnswerNowPlaceholderTextForTest(
+  value: string,
+  options?: { hasAnswerNowGate?: boolean },
+): boolean {
+  return isAnswerNowPlaceholderText(value, options);
+}
+
+export function htmlToMarkdownForTest(
+  html: string,
+  deps: { DOMParser: unknown; Node: unknown },
+): string {
+  return htmlToMarkdown(html, deps);
 }
 
 async function recoverAssistantResponse(
@@ -251,6 +319,10 @@ async function parseAssistantEvaluationResult(
 ): Promise<{ text: string; html?: string; meta: { turnId?: string | null; messageId?: string | null } } | null> {
   const { result } = evaluation;
   if (result.type === 'object' && result.value && typeof result.value === 'object' && 'text' in result.value) {
+    const hasAnswerNowGate =
+      typeof (result.value as { hasAnswerNowGate?: unknown }).hasAnswerNowGate === 'boolean'
+        ? ((result.value as { hasAnswerNowGate?: boolean }).hasAnswerNowGate ?? undefined)
+        : undefined;
     const html =
       typeof (result.value as { html?: unknown }).html === 'string'
         ? ((result.value as { html?: string }).html ?? undefined)
@@ -265,7 +337,7 @@ async function parseAssistantEvaluationResult(
         : undefined;
     const text = cleanAssistantText(String((result.value as { text: unknown }).text ?? ''));
     const normalized = text.toLowerCase();
-    if (isAnswerNowPlaceholderText(normalized)) {
+    if (isAnswerNowPlaceholderText(normalized, { hasAnswerNowGate })) {
       return null;
     }
     return { text, html, meta: { turnId, messageId } };
@@ -453,7 +525,7 @@ function normalizeAssistantSnapshot(
   const normalized = text.toLowerCase();
   // "Pro thinking" often renders a placeholder turn containing an "Answer now" gate.
   // Treat it as incomplete so browser mode keeps waiting for the real assistant text.
-  if (isAnswerNowPlaceholderText(normalized)) {
+  if (isAnswerNowPlaceholderText(normalized, { hasAnswerNowGate: snapshot?.hasAnswerNowGate })) {
     return null;
   }
   // Ignore user echo turns that can show up in project view fallbacks.
@@ -488,27 +560,19 @@ function buildAssistantSnapshotExpression(minTurnIndex?: number): string {
     const MIN_TURN_INDEX = ${minTurnLiteral};
     // Learned: the default turn DOM misses project view; keep a fallback extractor.
     ${buildAssistantExtractor('extractAssistantTurn')}
-    const extracted = extractAssistantTurn();
-    const isPlaceholder = (snapshot) => {
-      const normalized = String(snapshot?.text ?? '').toLowerCase().trim();
-      if (normalized === 'chatgpt said:' || normalized === 'chatgpt said') return true;
-      if (normalized.includes('file upload request') && (normalized.includes('pro thinking') || normalized.includes('chatgpt said'))) {
-        return true;
-      }
-      const hasAnswerNowGate = normalized.includes('answer now') || normalized.includes('今すぐ回答');
-      if (!hasAnswerNowGate) return false;
-      return (
-        normalized.includes('pro thinking') ||
-        normalized.includes('chatgpt said') ||
-        normalized.includes('思考中') ||
-        (normalized.includes('pro') && normalized.includes('thinking'))
-      );
+    ${buildHasAnswerNowGateExpression('detectAnswerNowGate')}
+    ${buildIsPlaceholderTextExpression('isPlaceholderText')}
+    const annotateSnapshot = (snapshot) => {
+      if (!snapshot) return null;
+      snapshot.hasAnswerNowGate = detectAnswerNowGate();
+      return snapshot;
     };
-    if (extracted && extracted.text && !isPlaceholder(extracted)) {
+    const extracted = annotateSnapshot(extractAssistantTurn());
+    if (extracted && extracted.text && !isPlaceholderText(extracted.text, { hasAnswerNowGate: extracted.hasAnswerNowGate })) {
       return extracted;
     }
     // Fallback for ChatGPT project view: answers can live outside conversation turns.
-    const fallback = ${buildMarkdownFallbackExtractor('MIN_TURN_INDEX')};
+    const fallback = annotateSnapshot(${buildMarkdownFallbackExtractor('MIN_TURN_INDEX')});
     return fallback ?? extracted;
   })()`;
 }
@@ -530,20 +594,16 @@ function buildResponseObserverExpression(timeoutMs: number, minTurnIndex?: numbe
     const ASSISTANT_SELECTOR = ${assistantLiteral};
     // Learned: settling avoids capturing mid-stream HTML; keep short.
     const settleDelayMs = 800;
+    ${buildHasAnswerNowGateExpression('detectAnswerNowGate')}
+    ${buildIsPlaceholderTextExpression('isPlaceholderText')}
+    const annotateSnapshot = (snapshot) => {
+      if (!snapshot) return null;
+      snapshot.hasAnswerNowGate = detectAnswerNowGate();
+      return snapshot;
+    };
     const isAnswerNowPlaceholder = (snapshot) => {
-      const normalized = String(snapshot?.text ?? '').toLowerCase().trim();
-      if (normalized === 'chatgpt said:' || normalized === 'chatgpt said') return true;
-      if (normalized.includes('file upload request') && (normalized.includes('pro thinking') || normalized.includes('chatgpt said'))) {
-        return true;
-      }
-      const hasAnswerNowGate = normalized.includes('answer now') || normalized.includes('今すぐ回答');
-      if (!hasAnswerNowGate) return false;
-      return (
-        normalized.includes('pro thinking') ||
-        normalized.includes('chatgpt said') ||
-        normalized.includes('思考中') ||
-        (normalized.includes('pro') && normalized.includes('thinking'))
-      );
+      if (!snapshot) return false;
+      return isPlaceholderText(snapshot?.text ?? '', { hasAnswerNowGate: snapshot.hasAnswerNowGate === true });
     };
 
     // Helper to detect assistant turns - must match buildAssistantExtractor logic for consistency.
@@ -579,12 +639,12 @@ function buildResponseObserverExpression(timeoutMs: number, minTurnIndex?: numbe
         const deadline = Date.now() + ${timeoutMs};
         let stopInterval = null;
         const observer = new MutationObserver(() => {
-          const extractedRaw = extractFromTurns();
+          const extractedRaw = annotateSnapshot(extractFromTurns());
           const extractedCandidate =
             extractedRaw && !isAnswerNowPlaceholder(extractedRaw) ? extractedRaw : null;
           let extracted = acceptSnapshot(extractedCandidate);
           if (!extracted) {
-            const fallbackRaw = extractFromMarkdownFallback();
+            const fallbackRaw = annotateSnapshot(extractFromMarkdownFallback());
             const fallbackCandidate =
               fallbackRaw && !isAnswerNowPlaceholder(fallbackRaw) ? fallbackRaw : null;
             extracted = acceptSnapshot(fallbackCandidate);
@@ -656,12 +716,12 @@ function buildResponseObserverExpression(timeoutMs: number, minTurnIndex?: numbe
       const stableTarget = shortAnswer ? 6 : 3;
       while (Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, settleIntervalMs));
-        const refreshedRaw = extractFromTurns();
+        const refreshedRaw = annotateSnapshot(extractFromTurns());
         const refreshedCandidate =
           refreshedRaw && !isAnswerNowPlaceholder(refreshedRaw) ? refreshedRaw : null;
         let refreshed = acceptSnapshot(refreshedCandidate);
         if (!refreshed) {
-          const fallbackRaw = extractFromMarkdownFallback();
+          const fallbackRaw = annotateSnapshot(extractFromMarkdownFallback());
           const fallbackCandidate =
             fallbackRaw && !isAnswerNowPlaceholder(fallbackRaw) ? fallbackRaw : null;
           refreshed = acceptSnapshot(fallbackCandidate);
@@ -686,11 +746,11 @@ function buildResponseObserverExpression(timeoutMs: number, minTurnIndex?: numbe
       return latest ?? snapshot;
     };
 
-    const extractedRaw = extractFromTurns();
+    const extractedRaw = annotateSnapshot(extractFromTurns());
     const extractedCandidate = extractedRaw && !isAnswerNowPlaceholder(extractedRaw) ? extractedRaw : null;
     let extracted = acceptSnapshot(extractedCandidate);
     if (!extracted) {
-      const fallbackRaw = extractFromMarkdownFallback();
+      const fallbackRaw = annotateSnapshot(extractFromMarkdownFallback());
       const fallbackCandidate = fallbackRaw && !isAnswerNowPlaceholder(fallbackRaw) ? fallbackRaw : null;
       extracted = acceptSnapshot(fallbackCandidate);
     }
@@ -914,6 +974,7 @@ function buildCopyExpression(meta: { messageId?: string | null; turnId?: string 
   return `(() => {
     ${buildClickDispatcher()}
     const BUTTON_SELECTOR = '${COPY_BUTTON_SELECTOR}';
+    const CONVERSATION_SELECTOR = ${JSON.stringify(CONVERSATION_TURN_SELECTOR)};
     const TIMEOUT_MS = 10000;
 
     const locateButton = () => {
@@ -934,7 +995,6 @@ function buildCopyExpression(meta: { messageId?: string | null; turnId?: string 
           return button;
         }
       }
-      const CONVERSATION_SELECTOR = ${JSON.stringify(CONVERSATION_TURN_SELECTOR)};
       const ASSISTANT_SELECTOR = '${ASSISTANT_ROLE_SELECTOR}';
       const isAssistantTurn = (node) => {
         if (!(node instanceof HTMLElement)) return false;
@@ -974,6 +1034,8 @@ function buildCopyExpression(meta: { messageId?: string | null; turnId?: string 
       }
       const originalWriteText = clipboard.writeText;
       const originalWrite = clipboard.write;
+      const htmlToMarkdown = ${buildHtmlToMarkdownFunctionExpression()};
+
       clipboard.writeText = (value) => {
         state.text = typeof value === 'string' ? value : '';
         state.updatedAt = Date.now();
@@ -985,11 +1047,33 @@ function buildCopyExpression(meta: { messageId?: string | null; turnId?: string 
           for (const item of list) {
             if (!item) continue;
             const types = Array.isArray(item.types) ? item.types : [];
-            if (types.includes('text/plain') && typeof item.getType === 'function') {
-              const blob = await item.getType('text/plain');
-              const text = await blob.text();
-              state.text = text ?? '';
-              state.updatedAt = Date.now();
+            if (typeof item.getType !== 'function') continue;
+
+            const getText = async (type) => {
+              try {
+                const blob = await item.getType(type);
+                return await blob.text();
+              } catch {
+                return '';
+              }
+            };
+
+            const markdownRaw = types.includes('text/markdown')
+              ? await getText('text/markdown')
+              : types.includes('text/x-markdown')
+                ? await getText('text/x-markdown')
+                : '';
+            const html = types.includes('text/html') ? await getText('text/html') : '';
+            const plain = types.includes('text/plain') ? await getText('text/plain') : '';
+            const markdownFromHtml = html ? htmlToMarkdown(html) : '';
+            const markdown = markdownRaw.trim()
+              ? markdownRaw
+              : markdownFromHtml.trim()
+                ? markdownFromHtml
+                : plain;
+            state.text = markdown ?? '';
+            state.updatedAt = Date.now();
+            if (state.text.trim()) {
               break;
             }
           }
@@ -1001,6 +1085,7 @@ function buildCopyExpression(meta: { messageId?: string | null; turnId?: string 
       };
       return {
         state,
+        htmlToMarkdown,
         restore: () => {
           clipboard.writeText = originalWriteText;
           clipboard.write = originalWrite;
@@ -1039,6 +1124,60 @@ function buildCopyExpression(meta: { messageId?: string | null; turnId?: string 
             return { success: Boolean(markdown.trim()), markdown, updatedAt };
           };
 
+          const BACKTICK = String.fromCharCode(96);
+          const FENCE = BACKTICK + BACKTICK + BACKTICK;
+
+          const looksLikeMarkdown = (value) => {
+            const text = String(value ?? '').trim();
+            if (!text) return false;
+            if (text.includes(FENCE)) return true;
+            if (/^\\s*(?:[-*+]\\s+|\\d+[.)]\\s+|[•·・]\\s+)/m.test(text)) return true;
+            return false;
+          };
+
+          const extractMarkdownFromDom = () => {
+            try {
+              const container =
+                button.closest(CONVERSATION_SELECTOR) ||
+                button.closest('[data-message-author-role="assistant"], [data-turn="assistant"]') ||
+                button.closest('[data-message-author-role], [data-turn]');
+              if (!container) return '';
+              const contentRoot =
+                container.querySelector('.markdown') ||
+                container.querySelector('[data-message-content]') ||
+                container.querySelector('[data-testid*="message"]') ||
+                container.querySelector('[data-testid*="assistant"]') ||
+                container.querySelector('.prose') ||
+                container.querySelector('[class*="markdown"]') ||
+                null;
+              if (!contentRoot) return '';
+              const html = contentRoot.innerHTML ?? '';
+              const converted = interception.htmlToMarkdown ? interception.htmlToMarkdown(html) : '';
+              const candidate = converted?.trim?.() ? converted : (contentRoot.innerText || contentRoot.textContent || '');
+              return String(candidate ?? '').trim();
+            } catch {
+              return '';
+            }
+          };
+
+          const shouldPreferDomMarkdown = (clipboardText, domText) => {
+            const clipped = String(clipboardText ?? '').trim();
+            const dom = String(domText ?? '').trim();
+            if (!dom) return false;
+            if (!clipped) return true;
+            const hasCopyArtifacts =
+              clipped.toLowerCase().includes('copy code') ||
+              clipped.includes('コードをコピーする') ||
+              clipped.includes('コードをコピー') ||
+              clipped.includes('Copy code');
+            const clipboardLooks = looksLikeMarkdown(clipped);
+            const domLooks = looksLikeMarkdown(dom);
+            if (!domLooks) return false;
+            if (hasCopyArtifacts) return true;
+            if (!clipboardLooks) return true;
+            return false;
+          };
+
           let lastText = '';
           let stableTicks = 0;
           const requiredStableTicks = 3;
@@ -1054,7 +1193,9 @@ function buildCopyExpression(meta: { messageId?: string | null; turnId?: string 
             stableTicks += 1;
             const ageMs = Date.now() - (payload.updatedAt || 0);
             if (stableTicks >= requiredStableTicks && ageMs >= requiredStableMs) {
-              finish(payload);
+              const domMarkdown = extractMarkdownFromDom();
+              const finalMarkdown = shouldPreferDomMarkdown(payload.markdown, domMarkdown) ? domMarkdown : payload.markdown;
+              finish({ ...payload, markdown: finalMarkdown });
             }
           };
 
@@ -1084,12 +1225,240 @@ function buildCopyExpression(meta: { messageId?: string | null; turnId?: string 
   })()`;
 }
 
+function buildHtmlToMarkdownFunctionExpression(): string {
+  return htmlToMarkdown.toString();
+}
+
+function htmlToMarkdown(
+  html: string,
+  deps?: { DOMParser?: unknown; Node?: unknown },
+): string {
+  try {
+    const DOMParserCtor = (deps?.DOMParser ??
+      (globalThis as unknown as { DOMParser?: unknown }).DOMParser) as
+      | { new (): { parseFromString: (markup: string, type: string) => unknown } }
+      | undefined;
+    if (!DOMParserCtor) {
+      return '';
+    }
+
+    const nodeRef = deps?.Node ?? (globalThis as unknown as { Node?: unknown }).Node;
+    const TEXT_NODE = (nodeRef as { TEXT_NODE?: number } | null | undefined)?.TEXT_NODE ?? 3;
+    const ELEMENT_NODE = (nodeRef as { ELEMENT_NODE?: number } | null | undefined)?.ELEMENT_NODE ?? 1;
+
+    const BACKTICK = String.fromCharCode(96);
+    const FENCE = BACKTICK + BACKTICK + BACKTICK;
+    const normalizeNewlines = (value: unknown) =>
+      String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\u00a0/g, ' ');
+
+    const doc = new DOMParserCtor().parseFromString(String(html ?? ''), 'text/html') as any;
+    const root = (() => {
+      const body = doc?.body;
+      if (body && body.childNodes && body.childNodes.length > 0) return body;
+      const element = doc?.documentElement;
+      const tag = (element?.tagName || '').toLowerCase();
+      if (element && tag && tag !== 'html') return element;
+      return body || element;
+    })();
+    if (!root) return '';
+
+    const formatInlineCode = (value: unknown) => {
+      const text = String(value ?? '');
+      if (!text) return '';
+      let maxRun = 0;
+      let currentRun = 0;
+      for (let i = 0; i < text.length; i += 1) {
+        if (text[i] === BACKTICK) {
+          currentRun += 1;
+          if (currentRun > maxRun) maxRun = currentRun;
+        } else {
+          currentRun = 0;
+        }
+      }
+      const fence = BACKTICK.repeat(Math.max(1, maxRun + 1));
+      const needsPadding = text.startsWith(BACKTICK) || text.endsWith(BACKTICK) || /^\s/.test(text) || /\s$/.test(text);
+      const content = needsPadding ? ' ' + text + ' ' : text;
+      return fence + content + fence;
+    };
+
+    const extractCodeLanguage = (code: any) => {
+      if (!code) return '';
+      const className = String(code.className ?? '');
+      const match = className.match(/language-([a-z0-9#+-]+)/i);
+      if (match && match[1]) return match[1];
+      const dataLang =
+        code.getAttribute?.('data-language') ||
+        code.getAttribute?.('data-lang') ||
+        code.dataset?.language ||
+        '';
+      return String(dataLang ?? '').trim();
+    };
+
+    const shouldIgnore = (node: any) => {
+      const tag = (node?.tagName || '').toLowerCase();
+      if (!tag) return false;
+      return (
+        tag === 'script' ||
+        tag === 'style' ||
+        tag === 'noscript' ||
+        tag === 'button' ||
+        tag === 'svg' ||
+        tag === 'path' ||
+        tag === 'title' ||
+        tag === 'desc'
+      );
+    };
+
+    const renderChildren = (parent: any, ctx: any): string =>
+      Array.from(parent?.childNodes || []).map((child: any) => render(child, ctx)).join('');
+
+    const renderListItem = (li: any, ordered: boolean, index: number, ctx: any): string => {
+      const indent = ctx?.listIndent ?? '';
+      const marker = ordered ? String(index) + '. ' : '- ';
+      const parts: string[] = [];
+      const nested: string[] = [];
+      for (const child of Array.from(li?.childNodes || []) as any[]) {
+        if (child && child.nodeType === ELEMENT_NODE) {
+          const tag = (child.tagName || '').toLowerCase();
+          if (tag === 'ul' || tag === 'ol') {
+            nested.push(render(child, { ...ctx, listIndent: indent + '  ' }));
+            continue;
+          }
+        }
+        parts.push(render(child, ctx));
+      }
+      const contentRaw = normalizeNewlines(parts.join('')).trim();
+      const contentLines = contentRaw ? contentRaw.split('\n') : [];
+      const firstLine = (contentLines.shift() ?? '').trim();
+      let line = indent + marker + firstLine;
+      const continuationIndent = indent + ' '.repeat(marker.length);
+      if (contentLines.length > 0) {
+        const continuation = contentLines
+          .map((value) => continuationIndent + String(value ?? '').trimEnd())
+          .join('\n')
+          .trimEnd();
+        if (continuation) {
+          line = line.trimEnd() + '\n' + continuation;
+        }
+      }
+      const nestedText = nested.join('').trimEnd();
+      if (nestedText) {
+        line += '\n' + nestedText;
+      }
+      return line.trimEnd();
+    };
+
+    const renderList = (node: any, ordered: boolean, ctx: any): string => {
+      const items = Array.from(node?.children || []).filter(
+        (child: any) => (child?.tagName || '').toLowerCase() === 'li',
+      );
+      if (!items.length) return '';
+      const lines: string[] = [];
+      for (let i = 0; i < items.length; i += 1) {
+        const li = items[i];
+        const line = renderListItem(li, ordered, i + 1, ctx);
+        if (line) lines.push(line);
+      }
+      return lines.join('\n') + '\n\n';
+    };
+
+    const render = (node: any, ctx: any): string => {
+      if (!node) return '';
+      if (node.nodeType === TEXT_NODE) {
+        return String(node.nodeValue ?? '');
+      }
+      if (node.nodeType !== ELEMENT_NODE) {
+        return '';
+      }
+      if (shouldIgnore(node)) {
+        return '';
+      }
+      const tag = (node.tagName || '').toLowerCase();
+      if (!tag) {
+        return renderChildren(node, ctx);
+      }
+      if (tag === 'br') {
+        return '\n';
+      }
+      if (tag === 'pre') {
+        const code = node.querySelector?.('code');
+        const lang = extractCodeLanguage(code);
+        const raw = code ? code.textContent ?? '' : node.textContent ?? '';
+        const codeText = normalizeNewlines(raw).replace(/\n+$/g, '');
+        return FENCE + (lang ? lang : '') + '\n' + codeText + '\n' + FENCE + '\n\n';
+      }
+      if (tag === 'code') {
+        if (ctx?.inPre) {
+          return String(node.textContent ?? '');
+        }
+        const text = String(node.textContent ?? '');
+        if (!text) return '';
+        return formatInlineCode(text);
+      }
+      if (tag === 'ul') {
+        return renderList(node, false, ctx);
+      }
+      if (tag === 'ol') {
+        return renderList(node, true, ctx);
+      }
+      if (/^h[1-6]$/.test(tag)) {
+        const level = Number.parseInt(tag.slice(1), 10);
+        const prefix = '#'.repeat(Number.isFinite(level) && level > 0 ? level : 1);
+        const text = renderChildren(node, ctx).trim();
+        return text ? prefix + ' ' + text + '\n\n' : '';
+      }
+      if (tag === 'p') {
+        const text = renderChildren(node, ctx).trim();
+        return text ? text + '\n\n' : '';
+      }
+      if (tag === 'a') {
+        const href = String(node.getAttribute?.('href') ?? '').trim();
+        const text = renderChildren(node, ctx).trim() || href;
+        if (!href) return text;
+        return '[' + text + '](' + href + ')';
+      }
+      if (tag === 'strong' || tag === 'b') {
+        const text = renderChildren(node, ctx).trim();
+        return text ? '**' + text + '**' : '';
+      }
+      if (tag === 'em' || tag === 'i') {
+        const text = renderChildren(node, ctx).trim();
+        return text ? '*' + text + '*' : '';
+      }
+      return renderChildren(node, ctx);
+    };
+
+    const rootTag = (root.tagName || '').toLowerCase();
+    let markdown =
+      rootTag === 'body'
+        ? renderChildren(root, { listIndent: '', inPre: false })
+        : render(root, { listIndent: '', inPre: false });
+    markdown = normalizeNewlines(markdown);
+    const fencedBlocks: string[] = [];
+    const fencePattern = new RegExp(FENCE + '[^]*?' + FENCE, 'g');
+    markdown = markdown.replace(fencePattern, (match: string) => {
+      fencedBlocks.push(match);
+      return '__ORACLE_CODE_BLOCK_' + (fencedBlocks.length - 1) + '__';
+    });
+    markdown = markdown.replace(/[ \t]+\n/g, '\n');
+    markdown = markdown.replace(/\n{3,}/g, '\n\n').trim();
+    markdown = markdown.replace(/__ORACLE_CODE_BLOCK_(\d+)__/g, (_match: string, index: string) => {
+      const idx = Number(index);
+      return Number.isFinite(idx) && fencedBlocks[idx] ? fencedBlocks[idx] : '';
+    });
+    return markdown;
+  } catch {
+    return '';
+  }
+}
+
 interface AssistantSnapshot {
   text?: string;
   html?: string;
   messageId?: string | null;
   turnId?: string | null;
   turnIndex?: number | null;
+  hasAnswerNowGate?: boolean;
 }
 
 const LANGUAGE_TAGS = new Set(

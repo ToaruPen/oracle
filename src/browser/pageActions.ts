@@ -5,6 +5,7 @@ export {
   ensureLoggedIn,
   ensurePromptReady,
 } from './actions/navigation.js';
+export { ensureNewConversation } from './actions/newConversation.js';
 export { ensureModelSelection } from './actions/modelSelection.js';
 export { submitPrompt, clearPromptComposer } from './actions/promptComposer.js';
 export {

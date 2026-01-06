@@ -19,6 +19,7 @@ import {
   ensureNotBlocked,
   ensureLoggedIn,
   ensurePromptReady,
+  ensureNewConversation,
   ensureModelSelection,
   submitPrompt,
   clearPromptComposer,
@@ -300,6 +301,18 @@ export async function runBrowserMode(options: BrowserRunOptions): Promise<Browse
       await raceWithDisconnect(ensurePromptReady(Runtime, config.inputTimeoutMs, logger));
     }
     logger(`Prompt textarea ready (initial focus, ${promptText.length.toLocaleString()} chars queued)`);
+
+    const targetPinsConversation = config.url.includes('/c/');
+    if (!targetPinsConversation) {
+      const started = await raceWithDisconnect(
+        ensureNewConversation(Runtime, logger, { timeoutMs: config.inputTimeoutMs }),
+      );
+      if (started.started) {
+        await raceWithDisconnect(ensurePromptReady(Runtime, config.inputTimeoutMs, logger));
+        logger(`Prompt textarea ready (after new chat, ${promptText.length.toLocaleString()} chars queued)`);
+      }
+    }
+
     const captureRuntimeSnapshot = async () => {
       try {
         if (client?.Target?.getTargetInfo) {
@@ -995,6 +1008,15 @@ async function runRemoteBrowserMode(
     await ensureLoggedIn(Runtime, logger, { remoteSession: true });
     await ensurePromptReady(Runtime, config.inputTimeoutMs, logger);
     logger(`Prompt textarea ready (initial focus, ${promptText.length.toLocaleString()} chars queued)`);
+
+    const targetPinsConversation = config.url.includes('/c/');
+    if (!targetPinsConversation) {
+      const started = await ensureNewConversation(Runtime, logger, { timeoutMs: config.inputTimeoutMs });
+      if (started.started) {
+        await ensurePromptReady(Runtime, config.inputTimeoutMs, logger);
+        logger(`Prompt textarea ready (after new chat, ${promptText.length.toLocaleString()} chars queued)`);
+      }
+    }
     try {
       const { result } = await Runtime.evaluate({
         expression: 'location.href',

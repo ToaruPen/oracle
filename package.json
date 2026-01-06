@@ -96,6 +96,7 @@
     "devtools-protocol": "0.0.1561482",
     "es-toolkit": "^1.43.0",
     "esbuild": "^0.27.2",
+    "linkedom": "^0.18.12",
     "puppeteer-core": "^24.34.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
