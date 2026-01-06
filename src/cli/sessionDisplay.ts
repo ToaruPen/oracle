@@ -13,6 +13,7 @@ import { formatTokenCount, formatTokenValue } from '../oracle/runUtils.js';
 import type { BrowserLogger } from '../browser/types.js';
 import { resumeBrowserSession } from '../browser/reattach.js';
 import { estimateTokenCount } from '../browser/utils.js';
+import { resolveBrowserConfig } from '../browser/config.js';
 import { formatSessionTableHeader, formatSessionTableRow, resolveSessionCost } from './sessionTable.js';
 
 const isTty = (): boolean => Boolean(process.stdout.isTTY);
@@ -143,7 +144,18 @@ export async function attachSession(sessionId: string, options?: AttachSessionOp
   if (canReattach) {
     const portInfo = runtime?.chromePort ? `port ${runtime.chromePort}` : 'unknown port';
     const urlInfo = runtime?.tabUrl ? `url=${runtime.tabUrl}` : 'url=unknown';
-    console.log(chalk.yellow(`Attempting to reattach to the existing Chrome session (${portInfo}, ${urlInfo})...`));
+    let timeoutInfo = '';
+    try {
+      const resolvedTimeoutMs = resolveBrowserConfig(metadata.browser?.config).timeoutMs;
+      timeoutInfo = `, timeout=${formatDurationMs(resolvedTimeoutMs)}`;
+    } catch {
+      // ignore
+    }
+    console.log(
+      chalk.yellow(
+        `Attempting to reattach to the existing Chrome session (${portInfo}, ${urlInfo}${timeoutInfo})...`,
+      ),
+    );
     try {
       const result = await resumeBrowserSession(
         runtime as NonNullable<typeof runtime>,
@@ -497,6 +509,23 @@ function formatRelativeDuration(referenceIso: string): string | null {
     parts.push(`${remainingMinutes}m`);
   }
   return parts.join(' ');
+}
+
+function formatDurationMs(durationMs: number): string {
+  const seconds = Math.max(1, Math.round(durationMs / 1000));
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (remainingMinutes > 0) {
+    return `${hours}h ${remainingMinutes}m`;
+  }
+  return `${hours}h`;
 }
 
 function printStatusExamples(): void {

@@ -74,12 +74,23 @@ export function resolveBrowserConfig(config: BrowserAutomationConfig | undefined
     config?.cleanupConversationForce ??
     envCleanupForce ??
     DEFAULT_BROWSER_CONFIG.cleanupConversationForce;
+  const defaultTimeoutMs = (() => {
+    if (typeof config?.timeoutMs === 'number' && Number.isFinite(config.timeoutMs) && config.timeoutMs > 0) {
+      return config.timeoutMs;
+    }
+    const desired = (desiredModel ?? '').toLowerCase();
+    // Pro/Thinking runs can legitimately take a long time; keep browser automation patient by default.
+    if (desired.includes('pro') || desired.includes('thinking')) {
+      return 7_200_000;
+    }
+    return DEFAULT_BROWSER_CONFIG.timeoutMs;
+  })();
   return {
     ...DEFAULT_BROWSER_CONFIG,
     ...(config ?? {}),
     url: normalizedUrl,
     chatgptUrl: normalizedUrl,
-    timeoutMs: config?.timeoutMs ?? DEFAULT_BROWSER_CONFIG.timeoutMs,
+    timeoutMs: defaultTimeoutMs,
     debugPort: config?.debugPort ?? debugPortEnv ?? DEFAULT_BROWSER_CONFIG.debugPort,
     inputTimeoutMs: config?.inputTimeoutMs ?? DEFAULT_BROWSER_CONFIG.inputTimeoutMs,
     cookieSync: config?.cookieSync ?? cookieSyncDefault,

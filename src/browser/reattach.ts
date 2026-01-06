@@ -112,7 +112,8 @@ export async function resumeBrowserSession(
 
     const waitForResponse = deps.waitForAssistantResponse ?? waitForAssistantResponse;
     const captureMarkdown = deps.captureAssistantMarkdown ?? captureAssistantMarkdown;
-    const timeoutMs = config?.timeoutMs ?? 120_000;
+    const resolved = resolveBrowserConfig(config ?? {});
+    const timeoutMs = resolved.timeoutMs;
     const pingTimeoutMs = Math.min(5_000, Math.max(1_500, Math.floor(timeoutMs * 0.05)));
     await withTimeout(
       Runtime.evaluate({ expression: '1+1', returnByValue: true }),

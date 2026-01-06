@@ -670,6 +670,24 @@ export async function getSessionPaths(sessionId: string): Promise<{
 
 async function markZombie(meta: SessionMetadata, { persist }: { persist: boolean }): Promise<SessionMetadata> {
   if (!isZombie(meta)) {
+    if (
+      persist &&
+      meta.status === 'error' &&
+      meta.errorMessage === 'Session marked as zombie (>60m stale)'
+    ) {
+      const stored = await fs.readFile(metaPath(meta.id), 'utf8').catch(() => null);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as Partial<SessionMetadata>;
+          if (parsed.status === meta.status && parsed.errorMessage === meta.errorMessage) {
+            return meta;
+          }
+        } catch {
+          // ignore; fall through to overwrite corrupted metadata
+        }
+      }
+      await fs.writeFile(metaPath(meta.id), JSON.stringify(meta, null, 2), 'utf8');
+    }
     return meta;
   }
   if (meta.mode === 'browser') {
@@ -701,7 +719,28 @@ async function markZombie(meta: SessionMetadata, { persist }: { persist: boolean
 }
 
 async function markDeadBrowser(meta: SessionMetadata, { persist }: { persist: boolean }): Promise<SessionMetadata> {
-  if (meta.status !== 'running' || meta.mode !== 'browser') {
+  if (meta.mode !== 'browser') {
+    return meta;
+  }
+  if (meta.status !== 'running') {
+    if (
+      persist &&
+      meta.status === 'error' &&
+      meta.errorMessage === 'Browser session ended (Chrome is no longer reachable)'
+    ) {
+      const stored = await fs.readFile(metaPath(meta.id), 'utf8').catch(() => null);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as Partial<SessionMetadata>;
+          if (parsed.status === meta.status && parsed.errorMessage === meta.errorMessage) {
+            return meta;
+          }
+        } catch {
+          // ignore; fall through to overwrite corrupted metadata
+        }
+      }
+      await fs.writeFile(metaPath(meta.id), JSON.stringify(meta, null, 2), 'utf8');
+    }
     return meta;
   }
   const runtime = meta.browser?.runtime;

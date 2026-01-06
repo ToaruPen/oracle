@@ -18,10 +18,19 @@ const PLACEHOLDER_LABEL_GATE_TEXT = ['chatgpt', 'assistant'] as const;
 
 function isAnswerNowPlaceholderText(
   normalized: string,
-  options?: { hasAnswerNowGate?: boolean },
+  options?: { hasAnswerNowGate?: boolean; isFinished?: boolean },
 ): boolean {
   const text = normalized.trim().toLowerCase();
   if (!text) return false;
+  // Some UI states briefly render a bare label (e.g. "ChatGPT:") before the real content arrives.
+  // Treat these as placeholders so we don't prematurely end the wait loop.
+  if (/^(chatgpt|assistant)\s*[:：]\s*$/.test(text)) {
+    // Allow legitimate label-only answers once the turn is finished (copy/share actions visible).
+    if (options?.isFinished === true && options?.hasAnswerNowGate !== true) {
+      return false;
+    }
+    return true;
+  }
   // Learned: "Pro thinking" shows a placeholder turn that contains "Answer now".
   // That is not the final answer and must be ignored in browser automation.
   const labelCandidate = text.replace(/[:：]+$/, '').trim();
@@ -54,6 +63,10 @@ function buildIsPlaceholderTextExpression(functionName: string): string {
   return `const ${functionName} = (value, options) => {
     const normalized = String(value ?? '').replace(/\\u00a0/g, ' ').toLowerCase().trim();
     if (!normalized) return false;
+    if (/^(chatgpt|assistant)\\s*[:：]\\s*$/.test(normalized)) {
+      if (options && options.isFinished === true && options.hasAnswerNowGate !== true) return false;
+      return true;
+    }
     const label = normalized.replace(/[:：]+$/, '').trim();
     const LABEL_ALWAYS = ${placeholdersAlwaysLiteral};
     const LABEL_GATE = ${placeholdersGateLiteral};
@@ -274,7 +287,7 @@ export function buildCopyExpressionForTest(
 
 export function isAnswerNowPlaceholderTextForTest(
   value: string,
-  options?: { hasAnswerNowGate?: boolean },
+  options?: { hasAnswerNowGate?: boolean; isFinished?: boolean },
 ): boolean {
   return isAnswerNowPlaceholderText(value, options);
 }
@@ -319,14 +332,18 @@ async function parseAssistantEvaluationResult(
 ): Promise<{ text: string; html?: string; meta: { turnId?: string | null; messageId?: string | null } } | null> {
   const { result } = evaluation;
   if (result.type === 'object' && result.value && typeof result.value === 'object' && 'text' in result.value) {
-    const hasAnswerNowGate =
-      typeof (result.value as { hasAnswerNowGate?: unknown }).hasAnswerNowGate === 'boolean'
-        ? ((result.value as { hasAnswerNowGate?: boolean }).hasAnswerNowGate ?? undefined)
-        : undefined;
-    const html =
-      typeof (result.value as { html?: unknown }).html === 'string'
-        ? ((result.value as { html?: string }).html ?? undefined)
-        : undefined;
+	    const hasAnswerNowGate =
+	      typeof (result.value as { hasAnswerNowGate?: unknown }).hasAnswerNowGate === 'boolean'
+	        ? ((result.value as { hasAnswerNowGate?: boolean }).hasAnswerNowGate ?? undefined)
+	        : undefined;
+	    const turnFinished =
+	      typeof (result.value as { turnFinished?: unknown }).turnFinished === 'boolean'
+	        ? ((result.value as { turnFinished?: boolean }).turnFinished ?? undefined)
+	        : undefined;
+	    const html =
+	      typeof (result.value as { html?: unknown }).html === 'string'
+	        ? ((result.value as { html?: string }).html ?? undefined)
+	        : undefined;
     const turnId =
       typeof (result.value as { turnId?: unknown }).turnId === 'string'
         ? ((result.value as { turnId?: string }).turnId ?? undefined)
@@ -335,11 +352,11 @@ async function parseAssistantEvaluationResult(
       typeof (result.value as { messageId?: unknown }).messageId === 'string'
         ? ((result.value as { messageId?: string }).messageId ?? undefined)
         : undefined;
-    const text = cleanAssistantText(String((result.value as { text: unknown }).text ?? ''));
-    const normalized = text.toLowerCase();
-    if (isAnswerNowPlaceholderText(normalized, { hasAnswerNowGate })) {
-      return null;
-    }
+	    const text = cleanAssistantText(String((result.value as { text: unknown }).text ?? ''));
+	    const normalized = text.toLowerCase();
+	    if (isAnswerNowPlaceholderText(normalized, { hasAnswerNowGate, isFinished: turnFinished })) {
+	      return null;
+	    }
     return { text, html, meta: { turnId, messageId } };
   }
   const fallbackText = typeof result.value === 'string' ? cleanAssistantText(result.value as string) : '';
@@ -525,7 +542,12 @@ function normalizeAssistantSnapshot(
   const normalized = text.toLowerCase();
   // "Pro thinking" often renders a placeholder turn containing an "Answer now" gate.
   // Treat it as incomplete so browser mode keeps waiting for the real assistant text.
-  if (isAnswerNowPlaceholderText(normalized, { hasAnswerNowGate: snapshot?.hasAnswerNowGate })) {
+  if (
+    isAnswerNowPlaceholderText(normalized, {
+      hasAnswerNowGate: snapshot?.hasAnswerNowGate,
+      isFinished: snapshot?.turnFinished,
+    })
+  ) {
     return null;
   }
   // Ignore user echo turns that can show up in project view fallbacks.
@@ -556,19 +578,37 @@ function buildAssistantSnapshotExpression(minTurnIndex?: number): string {
     typeof minTurnIndex === 'number' && Number.isFinite(minTurnIndex) && minTurnIndex >= 0
       ? Math.floor(minTurnIndex)
       : -1;
+  const conversationLiteral = JSON.stringify(CONVERSATION_TURN_SELECTOR);
+  const finishedLiteral = JSON.stringify(FINISHED_ACTIONS_SELECTOR);
   return `(() => {
     const MIN_TURN_INDEX = ${minTurnLiteral};
+    const CONVERSATION_SELECTOR = ${conversationLiteral};
+    const FINISHED_SELECTOR = ${finishedLiteral};
     // Learned: the default turn DOM misses project view; keep a fallback extractor.
     ${buildAssistantExtractor('extractAssistantTurn')}
     ${buildHasAnswerNowGateExpression('detectAnswerNowGate')}
     ${buildIsPlaceholderTextExpression('isPlaceholderText')}
+    const isTurnFinished = (turnIndex) => {
+      if (typeof turnIndex !== 'number' || turnIndex < 0) return false;
+      const turns = Array.from(document.querySelectorAll(CONVERSATION_SELECTOR));
+      const turn = turns[turnIndex];
+      if (!turn) return false;
+      if (turn.querySelector(FINISHED_SELECTOR)) return true;
+      const markdowns = turn.querySelectorAll('.markdown');
+      return Array.from(markdowns).some((n) => (n.textContent || '').trim() === 'Done');
+    };
     const annotateSnapshot = (snapshot) => {
       if (!snapshot) return null;
       snapshot.hasAnswerNowGate = detectAnswerNowGate();
+      snapshot.turnFinished = isTurnFinished(snapshot.turnIndex);
       return snapshot;
     };
     const extracted = annotateSnapshot(extractAssistantTurn());
-    if (extracted && extracted.text && !isPlaceholderText(extracted.text, { hasAnswerNowGate: extracted.hasAnswerNowGate })) {
+    if (
+      extracted &&
+      extracted.text &&
+      !isPlaceholderText(extracted.text, { hasAnswerNowGate: extracted.hasAnswerNowGate, isFinished: extracted.turnFinished === true })
+    ) {
       return extracted;
     }
     // Fallback for ChatGPT project view: answers can live outside conversation turns.
@@ -592,19 +632,32 @@ function buildResponseObserverExpression(timeoutMs: number, minTurnIndex?: numbe
     const FINISHED_SELECTOR = '${FINISHED_ACTIONS_SELECTOR}';
     const CONVERSATION_SELECTOR = ${conversationLiteral};
     const ASSISTANT_SELECTOR = ${assistantLiteral};
-    // Learned: settling avoids capturing mid-stream HTML; keep short.
-    const settleDelayMs = 800;
-    ${buildHasAnswerNowGateExpression('detectAnswerNowGate')}
-    ${buildIsPlaceholderTextExpression('isPlaceholderText')}
-    const annotateSnapshot = (snapshot) => {
-      if (!snapshot) return null;
-      snapshot.hasAnswerNowGate = detectAnswerNowGate();
-      return snapshot;
-    };
-    const isAnswerNowPlaceholder = (snapshot) => {
-      if (!snapshot) return false;
-      return isPlaceholderText(snapshot?.text ?? '', { hasAnswerNowGate: snapshot.hasAnswerNowGate === true });
-    };
+	    // Learned: settling avoids capturing mid-stream HTML; keep short.
+	    const settleDelayMs = 800;
+	    ${buildHasAnswerNowGateExpression('detectAnswerNowGate')}
+	    ${buildIsPlaceholderTextExpression('isPlaceholderText')}
+	    const isTurnFinished = (turnIndex) => {
+	      if (typeof turnIndex !== 'number' || turnIndex < 0) return false;
+	      const turns = Array.from(document.querySelectorAll(CONVERSATION_SELECTOR));
+	      const turn = turns[turnIndex];
+	      if (!turn) return false;
+	      if (turn.querySelector(FINISHED_SELECTOR)) return true;
+	      const markdowns = turn.querySelectorAll('.markdown');
+	      return Array.from(markdowns).some((n) => (n.textContent || '').trim() === 'Done');
+	    };
+	    const annotateSnapshot = (snapshot) => {
+	      if (!snapshot) return null;
+	      snapshot.hasAnswerNowGate = detectAnswerNowGate();
+	      snapshot.turnFinished = isTurnFinished(snapshot.turnIndex);
+	      return snapshot;
+	    };
+	    const isAnswerNowPlaceholder = (snapshot) => {
+	      if (!snapshot) return false;
+	      return isPlaceholderText(snapshot?.text ?? '', {
+	        hasAnswerNowGate: snapshot.hasAnswerNowGate === true,
+	        isFinished: snapshot.turnFinished === true,
+	      });
+	    };
 
     // Helper to detect assistant turns - must match buildAssistantExtractor logic for consistency.
     const isAssistantTurn = (node) => {
@@ -686,9 +739,9 @@ function buildResponseObserverExpression(timeoutMs: number, minTurnIndex?: numbe
       });
 
     // Check if the last assistant turn has finished (scoped to avoid detecting old turns).
-    const isLastAssistantTurnFinished = () => {
-      const turns = Array.from(document.querySelectorAll(CONVERSATION_SELECTOR));
-      let lastAssistantTurn = null;
+	    const isLastAssistantTurnFinished = () => {
+	      const turns = Array.from(document.querySelectorAll(CONVERSATION_SELECTOR));
+	      let lastAssistantTurn = null;
       for (let i = turns.length - 1; i >= 0; i--) {
         if (isAssistantTurn(turns[i])) {
           lastAssistantTurn = turns[i];
@@ -699,9 +752,11 @@ function buildResponseObserverExpression(timeoutMs: number, minTurnIndex?: numbe
       // Check for action buttons in this specific turn
       if (lastAssistantTurn.querySelector(FINISHED_SELECTOR)) return true;
       // Check for "Done" text in this turn's markdown
-      const markdowns = lastAssistantTurn.querySelectorAll('.markdown');
-      return Array.from(markdowns).some((n) => (n.textContent || '').trim() === 'Done');
-    };
+	      const markdowns = lastAssistantTurn.querySelectorAll('.markdown');
+	      return Array.from(markdowns).some((n) => (n.textContent || '').trim() === 'Done');
+	    };
+	    const isSnapshotFinished = (snapshot) =>
+	      snapshot && typeof snapshot.turnIndex === 'number' ? isTurnFinished(snapshot.turnIndex) : isLastAssistantTurnFinished();
 
     const waitForSettle = async (snapshot) => {
       // Learned: short answers can be 1-2 tokens; enforce longer settle windows to avoid truncation.
@@ -735,9 +790,9 @@ function buildResponseObserverExpression(timeoutMs: number, minTurnIndex?: numbe
           stableCycles = 0;
         } else {
           stableCycles += 1;
-        }
-        const stopVisible = Boolean(document.querySelector(STOP_SELECTOR));
-        const finishedVisible = isLastAssistantTurnFinished();
+	        }
+	        const stopVisible = Boolean(document.querySelector(STOP_SELECTOR));
+	        const finishedVisible = isSnapshotFinished(latest);
 
         if (finishedVisible || (!stopVisible && stableCycles >= stableTarget)) {
           break;
@@ -1459,6 +1514,7 @@ interface AssistantSnapshot {
   turnId?: string | null;
   turnIndex?: number | null;
   hasAnswerNowGate?: boolean;
+  turnFinished?: boolean;
 }
 
 const LANGUAGE_TAGS = new Set(

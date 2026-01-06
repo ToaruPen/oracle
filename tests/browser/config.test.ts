@@ -10,6 +10,7 @@ describe('resolveBrowserConfig', () => {
     expect(resolved.cookieSync).toBe(!isWindows);
     expect(resolved.headless).toBe(false);
     expect(resolved.manualLogin).toBe(isWindows);
+    expect(resolved.timeoutMs).toBe(7_200_000);
   });
 
   test('applies overrides', () => {
@@ -42,5 +43,11 @@ describe('resolveBrowserConfig', () => {
         desiredModel: 'GPT-5.2 Pro',
       }),
     ).toThrow(/Temporary Chat/i);
+  });
+
+  test('defaults browser timeout based on desiredModel', () => {
+    expect(resolveBrowserConfig({ desiredModel: 'GPT-5.2' }).timeoutMs).toBe(1_200_000);
+    expect(resolveBrowserConfig({ desiredModel: 'GPT-5.2 Pro' }).timeoutMs).toBe(7_200_000);
+    expect(resolveBrowserConfig({ desiredModel: 'GPT-5.2 Thinking' }).timeoutMs).toBe(7_200_000);
   });
 });

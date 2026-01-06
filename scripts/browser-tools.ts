@@ -34,7 +34,22 @@ async function connectBrowser(port: number) {
 async function getActivePage(port: number) {
   const browser = await connectBrowser(port);
   const pages = await browser.pages();
-  const page = pages.at(-1);
+  const pickLastMatch = (predicate: (page: (typeof pages)[number]) => boolean) => {
+    for (let index = pages.length - 1; index >= 0; index -= 1) {
+      const page = pages[index];
+      if (page && predicate(page)) {
+        return page;
+      }
+    }
+    return null;
+  };
+
+  const isNotBlank = (page: (typeof pages)[number]) => {
+    const url = page.url();
+    return url !== 'about:blank' && url !== '';
+  };
+
+  const page = pickLastMatch(isNotBlank) ?? pages.at(-1);
   if (!page) {
     await browser.disconnect();
     throw new Error('No active tab found');

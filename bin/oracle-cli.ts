@@ -346,9 +346,17 @@ program
     ),
   )
   .addOption(new Option('--browser-url <url>', `Alias for --chatgpt-url (default ${CHATGPT_URL}).`).hideHelp())
-  .addOption(new Option('--browser-timeout <ms|s|m>', 'Maximum time to wait for an answer (default 1200s / 20m).').hideHelp())
   .addOption(
-    new Option('--browser-input-timeout <ms|s|m>', 'Maximum time to wait for the prompt textarea (default 30s).').hideHelp(),
+    new Option(
+      '--browser-timeout <ms|s|m>',
+      'Maximum time to wait for an answer (default: Pro/Thinking 2h; other models 20m).',
+    ).hideHelp(),
+  )
+  .addOption(
+    new Option(
+      '--browser-input-timeout <ms|s|m>',
+      'Maximum time to wait for the prompt textarea (default 60s).',
+    ).hideHelp(),
   )
   .addOption(
     new Option('--browser-port <port>', 'Use a fixed Chrome DevTools port (helpful on WSL firewalls).')
@@ -1280,8 +1288,8 @@ function printDebugHelp(cliName: string): void {
     ['--browser-chrome-path <path>', 'Point to a custom Chrome/Chromium binary.'],
     ['--browser-cookie-path <path>', 'Use a specific Chrome/Chromium cookie store file.'],
     ['--browser-url <url>', 'Alias for --chatgpt-url.'],
-    ['--browser-timeout <ms|s|m>', 'Cap total wait time for the assistant response.'],
-    ['--browser-input-timeout <ms|s|m>', 'Cap how long we wait for the composer textarea.'],
+    ['--browser-timeout <ms|s|m>', 'Cap total wait time for the assistant response (default: Pro/Thinking 2h; others 20m).'],
+    ['--browser-input-timeout <ms|s|m>', 'Cap how long we wait for the composer textarea (default 60s).'],
     ['--browser-no-cookie-sync', 'Skip copying cookies from your main profile.'],
     ['--browser-manual-login', 'Skip cookie copy; reuse a persistent automation profile and log in manually.'],
     ['--browser-headless', 'Launch Chrome in headless mode.'],

@@ -2,10 +2,17 @@ import { describe, expect, test } from 'vitest';
 import { isAnswerNowPlaceholderTextForTest } from '../../src/browser/actions/assistantResponse.ts';
 
 describe('assistantResponse placeholder detection', () => {
-  test('treats label-only turns as placeholders only when Answer now gate is present', () => {
+  test('treats label-only turns as placeholders', () => {
     expect(isAnswerNowPlaceholderTextForTest('ChatGPT:', { hasAnswerNowGate: true })).toBe(true);
+    expect(isAnswerNowPlaceholderTextForTest('ChatGPT:', { hasAnswerNowGate: false })).toBe(true);
+    expect(isAnswerNowPlaceholderTextForTest('assistant:', { hasAnswerNowGate: false })).toBe(true);
+    expect(isAnswerNowPlaceholderTextForTest('ChatGPT:', { hasAnswerNowGate: false, isFinished: true })).toBe(false);
+    expect(isAnswerNowPlaceholderTextForTest('assistant:', { hasAnswerNowGate: false, isFinished: true })).toBe(false);
+    expect(isAnswerNowPlaceholderTextForTest('assistant:', { hasAnswerNowGate: true, isFinished: true })).toBe(true);
+
     expect(isAnswerNowPlaceholderTextForTest('chatgpt', { hasAnswerNowGate: true })).toBe(true);
-    expect(isAnswerNowPlaceholderTextForTest('ChatGPT:', { hasAnswerNowGate: false })).toBe(false);
+    expect(isAnswerNowPlaceholderTextForTest('chatgpt', { hasAnswerNowGate: false })).toBe(false);
+    expect(isAnswerNowPlaceholderTextForTest('assistant', { hasAnswerNowGate: true })).toBe(true);
     expect(isAnswerNowPlaceholderTextForTest('assistant', { hasAnswerNowGate: false })).toBe(false);
   });
 

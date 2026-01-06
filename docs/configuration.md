@@ -23,12 +23,12 @@ Oracle reads an optional per-user config from `~/.oracle/config.json`. The file 
     chromeCookiePath: null,
     chatgptUrl: "https://chatgpt.com/", // root is fine; folder URLs also work
     url: null, // alias for chatgptUrl (kept for back-compat)
-    debugPort: null,          // fixed DevTools port (env: ORACLE_BROWSER_PORT / ORACLE_BROWSER_DEBUG_PORT)
-    timeoutMs: 1200000,
-    inputTimeoutMs: 30000,
+    debugPort: null, // fixed DevTools port (env: ORACLE_BROWSER_PORT / ORACLE_BROWSER_DEBUG_PORT)
+    // timeoutMs: 1200000, // omit to use defaults (20m non-Pro; 2h Pro/Thinking)
+    // inputTimeoutMs: 60000,
     modelStrategy: "select", // select | current | ignore (ChatGPT only; ignored for Gemini web)
     thinkingTime: "extended", // light | standard | extended | heavy (ChatGPT Thinking/Pro models)
-    manualLogin: false,        // set true to reuse a persistent automation profile and sign in once (Windows defaults to true when unset)
+    manualLogin: false, // set true to reuse a persistent automation profile and sign in once (Windows defaults to true when unset)
     manualLoginProfileDir: null, // override profile dir (or set ORACLE_BROWSER_PROFILE_DIR)
     cleanupConversation: "none", // none | archive | delete (browser only; archive hides the thread from the sidebar)
     cleanupConversationForce: false, // allow cleanup even when chatgptUrl targets a specific /c/<id> (dangerous)
@@ -63,6 +63,10 @@ Oracle reads an optional per-user config from `~/.oracle/config.json`. The file 
 ## Precedence
 
 CLI flags → `config.json` → environment → built-in defaults.
+
+Browser timeouts (when unset):
+- `browser.timeoutMs` defaults to `20m` for non-Pro models, and `2h` for Pro/Thinking models.
+- `browser.inputTimeoutMs` defaults to `60s`.
 
 - `engine`, `model`, `search`, `filesReport`, `heartbeatSeconds`, and `apiBaseUrl` in `config.json` override the auto-detected values unless explicitly set on the CLI.
 - If `azure.endpoint` (or `--azure-endpoint`) is set, Oracle reads `AZURE_OPENAI_API_KEY` first and falls back to `OPENAI_API_KEY` for GPT models.

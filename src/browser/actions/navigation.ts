@@ -16,6 +16,13 @@ export async function navigateToChatGPT(
   logger(`Navigating to ${url}`);
   await Page.navigate({ url });
   await waitForDocumentReady(Runtime, 45_000);
+  try {
+    if (typeof Page.bringToFront === 'function') {
+      await Page.bringToFront();
+    }
+  } catch {
+    // ignore; bringToFront can fail in headless/remote contexts
+  }
 }
 
 export interface PromptReadyNavigationOptions {

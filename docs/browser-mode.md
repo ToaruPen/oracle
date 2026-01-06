@@ -53,7 +53,7 @@ You can pass the same payload inline (`--browser-inline-cookies '<json or base64
 - `--browser-chrome-profile`, `--browser-chrome-path`: cookie source + binary override (defaults to the standard `"Default"` Chrome profile so existing ChatGPT logins carry over).
 - `--browser-cookie-path`: explicit path to the Chrome/Chromium/Edge `Cookies` SQLite DB. Handy when you launch a fork via `--browser-chrome-path` and want to copy its session cookies; see [docs/chromium-forks.md](chromium-forks.md) for examples.
 - `--chatgpt-url`: override the ChatGPT base URL. Works with the root homepage (`https://chatgpt.com/`) **or** a specific workspace/folder link such as `https://chatgpt.com/g/.../project`. `--browser-url` stays as a hidden alias.
-- `--browser-timeout`, `--browser-input-timeout`: `1200s (20m)`/`30s` defaults. Durations accept `ms`, `s`, `m`, or `h` and can be chained (`1h2m10s`).
+- `--browser-timeout`, `--browser-input-timeout`: `20m`/`60s` defaults (`Pro`/`Thinking` models default to `2h` for `--browser-timeout`). Durations accept `ms`, `s`, `m`, or `h` and can be chained (`1h2m10s`).
 - `--browser-model-strategy <select|current|ignore>`: control ChatGPT model selection. `select` (default) switches to the requested model; `current` keeps the active model and logs its label; `ignore` skips the picker entirely. (Ignored for Gemini web runs.)
 - `--browser-cleanup-conversation <none|archive|delete>`: optional ChatGPT history cleanup after a successful browser run. `archive` hides the thread from the sidebar to reduce clutter (config: `browser.cleanupConversation`; env: `ORACLE_BROWSER_CLEANUP_CONVERSATION`). Use `--browser-cleanup-conversation-force` only if you intentionally target a specific `/c/<id>` URL.
 - `--browser-thinking-time <light|standard|extended|heavy>`: set the ChatGPT thinking-time intensity (Thinking/Pro models only). You can also set a default in `~/.oracle/config.json` via `browser.thinkingTime`.
@@ -80,6 +80,8 @@ You can pass the same payload inline (`--browser-inline-cookies '<json or base64
     ```
 
 All options are persisted with the session so reruns (`oracle exec <id>`) reuse the same automation settings.
+
+Note: ChatGPT can show an “Answer now” placeholder while Pro/Thinking responses are still processing. Oracle intentionally waits for the real answer (it never clicks “Answer now”), so the default timeout is longer for Pro/Thinking models.
 
 ### Manual login mode (persistent profile, no cookie copy)
 
