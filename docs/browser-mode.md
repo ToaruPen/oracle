@@ -81,7 +81,7 @@ You can pass the same payload inline (`--browser-inline-cookies '<json or base64
 
 All options are persisted with the session so reruns (`oracle exec <id>`) reuse the same automation settings.
 
-Note: ChatGPT can show an “Answer now” placeholder while Pro/Thinking responses are still processing. Oracle intentionally waits for the real answer (it never clicks “Answer now”), so the default timeout is longer for Pro/Thinking models.
+Note: Pro/Thinking responses can legitimately take 20m to more than 1h. During that time ChatGPT can show an “Answer now” placeholder while the real response is still processing. Oracle intentionally waits for the real answer (it never clicks “Answer now”), so the default timeout is longer for Pro/Thinking models.
 
 ### Manual login mode (persistent profile, no cookie copy)
 

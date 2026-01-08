@@ -14,6 +14,7 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "types": [],
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "typeRoots": ["./src/types", "./node_modules/@types"],
     "paths": {

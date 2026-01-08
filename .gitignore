@@ -13,3 +13,7 @@ vendor/oracle-notifier/OracleIcon.icns
 vendor/oracle-notifier/OracleIcon.iconset
 /.claude
 .serena/
+/.oracle-home/
+/.oracle-browser-profile-foragents-check-*/
+/.tmp-cookie-check.mjs
+/.write-test

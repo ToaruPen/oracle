@@ -17,13 +17,14 @@ Oracle bundles a prompt + selected files into one “one-shot” request so anot
 
 ## Main use case (browser, GPT‑5.2 Pro)
 
-Default workflow: `--engine browser` with `--model gpt-5.2-pro`. This is the “human-in-the-loop” path (often minutes); it creates a stored session you can reattach to.
+Default workflow: `--engine browser` with `--model gpt-5.2-pro`. This is the “human-in-the-loop” path (20m+ is normal; sometimes >1h); it creates a stored session you can reattach to.
 
 Recommended defaults:
 - Browser engine: `--engine browser`
 - Pro model: `--model gpt-5.2-pro --browser-model-strategy select`
 - Keep ChatGPT history clean: `--browser-cleanup-conversation archive` (or `delete`, which may fall back to `archive`)
 - Pro UI note: never click “Answer now” / 「今すぐ回答」; wait for the real assistant answer
+- Expect long waits on Pro/Thinking (20m to >1h). If it looks idle, check the stored session and reattach instead of rerunning.
 - Concurrency note: avoid parallel browser runs with the same `--browser-manual-login` profile (`~/.oracle/browser-profile`); use distinct `ORACLE_BROWSER_PROFILE_DIR` per run or `--remote-chrome`
 
 ## Golden path
